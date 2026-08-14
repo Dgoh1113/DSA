@@ -1,15 +1,19 @@
 package adt;
 
 /**
- * A custom linked list implementation of ListInterface.
- * Acts as the Master Guest Registry (Module 5).
+ * A custom Doubly Linked List implementation of ListInterface.
+ * Used by Module 4 (Loyalty and Rewards Service) for member/transaction management.
  * No java.util collections used.
+ *
+ * Features prev/next pointers and lastNode for efficient operations
+ * at both ends of the list.
  *
  * @param <T> The type of elements in the list.
  */
 public class CustomLinkedList<T> implements ListInterface<T> {
 
     private Node firstNode;
+    private Node lastNode;
     private int numberOfEntries;
 
     public CustomLinkedList() {
@@ -21,9 +25,11 @@ public class CustomLinkedList<T> implements ListInterface<T> {
         Node newNode = new Node(newEntry);
         if (isEmpty()) {
             firstNode = newNode;
+            lastNode = newNode;
         } else {
-            Node lastNode = getNodeAt(numberOfEntries);
+            newNode.prev = lastNode;
             lastNode.next = newNode;
+            lastNode = newNode;
         }
         numberOfEntries++;
     }
@@ -33,12 +39,30 @@ public class CustomLinkedList<T> implements ListInterface<T> {
         if (newPosition >= 1 && newPosition <= numberOfEntries + 1) {
             Node newNode = new Node(newEntry);
             if (newPosition == 1) {
+                // Insert at front
                 newNode.next = firstNode;
+                if (firstNode != null) {
+                    firstNode.prev = newNode;
+                }
                 firstNode = newNode;
+                if (numberOfEntries == 0) {
+                    lastNode = newNode;
+                }
+            } else if (newPosition == numberOfEntries + 1) {
+                // Insert at end
+                newNode.prev = lastNode;
+                lastNode.next = newNode;
+                lastNode = newNode;
             } else {
+                // Insert in the middle
                 Node nodeBefore = getNodeAt(newPosition - 1);
-                newNode.next = nodeBefore.next;
+                Node nodeAfter = nodeBefore.next;
+                newNode.prev = nodeBefore;
+                newNode.next = nodeAfter;
                 nodeBefore.next = newNode;
+                if (nodeAfter != null) {
+                    nodeAfter.prev = newNode;
+                }
             }
             numberOfEntries++;
             return true;
@@ -50,14 +74,27 @@ public class CustomLinkedList<T> implements ListInterface<T> {
     public T remove(int givenPosition) {
         T result = null;
         if (givenPosition >= 1 && givenPosition <= numberOfEntries) {
-            if (givenPosition == 1) {
-                result = firstNode.data;
+            Node nodeToRemove = getNodeAt(givenPosition);
+            result = nodeToRemove.data;
+
+            if (numberOfEntries == 1) {
+                // Removing the only node
+                firstNode = null;
+                lastNode = null;
+            } else if (givenPosition == 1) {
+                // Removing first node
                 firstNode = firstNode.next;
+                firstNode.prev = null;
+            } else if (givenPosition == numberOfEntries) {
+                // Removing last node
+                lastNode = lastNode.prev;
+                lastNode.next = null;
             } else {
-                Node nodeBefore = getNodeAt(givenPosition - 1);
-                Node nodeToRemove = nodeBefore.next;
-                result = nodeToRemove.data;
-                nodeBefore.next = nodeToRemove.next;
+                // Removing from middle
+                Node prevNode = nodeToRemove.prev;
+                Node nextNode = nodeToRemove.next;
+                prevNode.next = nextNode;
+                nextNode.prev = prevNode;
             }
             numberOfEntries--;
         }
@@ -67,6 +104,7 @@ public class CustomLinkedList<T> implements ListInterface<T> {
     @Override
     public final void clear() {
         firstNode = null;
+        lastNode = null;
         numberOfEntries = 0;
     }
 
@@ -111,21 +149,37 @@ public class CustomLinkedList<T> implements ListInterface<T> {
         return numberOfEntries == 0;
     }
 
+    /**
+     * Gets the node at a given 1-indexed position.
+     * Optimized: traverses from whichever end is closer.
+     */
     private Node getNodeAt(int givenPosition) {
-        Node currentNode = firstNode;
-        for (int counter = 1; counter < givenPosition; counter++) {
-            currentNode = currentNode.next;
+        if (givenPosition <= numberOfEntries / 2) {
+            // Traverse from front
+            Node currentNode = firstNode;
+            for (int counter = 1; counter < givenPosition; counter++) {
+                currentNode = currentNode.next;
+            }
+            return currentNode;
+        } else {
+            // Traverse from back
+            Node currentNode = lastNode;
+            for (int counter = numberOfEntries; counter > givenPosition; counter--) {
+                currentNode = currentNode.prev;
+            }
+            return currentNode;
         }
-        return currentNode;
     }
 
-    // Inner Node class
+    // Inner Node class — Doubly linked with prev and next pointers
     private class Node {
         private T data;
+        private Node prev;
         private Node next;
 
         private Node(T data) {
             this.data = data;
+            this.prev = null;
             this.next = null;
         }
     }

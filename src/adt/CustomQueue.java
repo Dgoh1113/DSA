@@ -2,7 +2,7 @@ package adt;
 
 /**
  * A custom linked-node implementation of QueueInterface.
- * For Standard Bookings waiting list (Module 1).
+ * For Standard Bookings waiting list (Module 1) — FIFO ordering.
  * No java.util collections used.
  *
  * @param <T> The type of elements in the queue.
@@ -65,6 +65,20 @@ public class CustomQueue<T> implements QueueInterface<T> {
     @Override
     public int size() {
         return count;
+    }
+
+    /**
+     * Returns all queued items as a list without removing them.
+     * Useful for displaying the current queue state.
+     */
+    public CustomLinkedList<T> toList() {
+        CustomLinkedList<T> list = new CustomLinkedList<>();
+        Node current = firstNode;
+        while (current != null) {
+            list.add(current.data);
+            current = current.next;
+        }
+        return list;
     }
 
     // Inner Node class

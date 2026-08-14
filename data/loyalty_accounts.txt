@@ -1,0 +1,2 @@
+G1000|12000|DIAMOND||Initial Seed Points
+G1001|3500|GOLD||Initial Seed Points

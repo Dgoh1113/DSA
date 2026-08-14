@@ -1,34 +1,39 @@
 package entity;
 
 /**
- * Entity: Stores room information.
+ * Entity: Room — Physical room inventory and operational status.
  * Pure data blueprint — no business logic.
+ *
+ * Primary Key: roomNo
+ * Core Attributes: roomType, nightlyRate, status
+ * Status values: AVAILABLE, OCCUPIED, MAINTENANCE
+ * Room types: STANDARD, DELUXE, SUITE
  */
 public class Room {
 
-    private String roomNumber;
-    private String roomType;   // e.g. "Standard", "Deluxe", "Suite"
-    private double price;
-    private String status;     // e.g. "Available", "Occupied", "Reserved"
+    private String roomNo;         // PK (e.g., "101", "202")
+    private String roomType;       // STANDARD, DELUXE, SUITE
+    private double nightlyRate;
+    private String status;         // AVAILABLE, OCCUPIED, MAINTENANCE
 
     public Room() {
     }
 
-    public Room(String roomNumber, String roomType, double price, String status) {
-        this.roomNumber = roomNumber;
+    public Room(String roomNo, String roomType, double nightlyRate, String status) {
+        this.roomNo = roomNo;
         this.roomType = roomType;
-        this.price = price;
+        this.nightlyRate = nightlyRate;
         this.status = status;
     }
 
     // --- Getters & Setters ---
 
-    public String getRoomNumber() {
-        return roomNumber;
+    public String getRoomNo() {
+        return roomNo;
     }
 
-    public void setRoomNumber(String roomNumber) {
-        this.roomNumber = roomNumber;
+    public void setRoomNo(String roomNo) {
+        this.roomNo = roomNo;
     }
 
     public String getRoomType() {
@@ -39,12 +44,12 @@ public class Room {
         this.roomType = roomType;
     }
 
-    public double getPrice() {
-        return price;
+    public double getNightlyRate() {
+        return nightlyRate;
     }
 
-    public void setPrice(double price) {
-        this.price = price;
+    public void setNightlyRate(double nightlyRate) {
+        this.nightlyRate = nightlyRate;
     }
 
     public String getStatus() {
@@ -57,7 +62,7 @@ public class Room {
 
     @Override
     public String toString() {
-        return "Room{number='" + roomNumber + "', type='" + roomType
-                + "', price=" + price + ", status='" + status + "'}";
+        return "Room{no='" + roomNo + "', type='" + roomType
+                + "', rate=" + nightlyRate + ", status='" + status + "'}";
     }
 }

@@ -1,31 +1,66 @@
 package entity;
 
 /**
- * Entity: Stores guest information.
+ * Entity: Guest — Master customer profile.
  * Pure data blueprint — no business logic.
- * Implements Comparable so it can be used in BST and PriorityQueue.
+ *
+ * Primary Key: guestId (auto-generated)
+ * Core Attributes: name, icPassport, contactNo, email, loyaltyTier
+ * Tracks membership tier level (STANDARD, SILVER, GOLD, PLATINUM, DIAMOND).
  */
-public class Guest implements Comparable<Guest> {
+public class Guest {
 
+    private static int idCounter = 1000;
+
+    private String guestId;       // PK, auto-generated (e.g., "G1001")
     private String name;
-    private String icNumber;
-    private String phoneNumber;
-    private String confirmationNumber; // 8-digit confirmation number
-    private LoyaltyProfile loyaltyProfile;
+    private String icPassport;
+    private String contactNo;
+    private String email;
+    private String loyaltyTier;   // STANDARD, SILVER, GOLD, PLATINUM, DIAMOND
 
     public Guest() {
-        this.loyaltyProfile = new LoyaltyProfile();
+        this.guestId = generateId();
+        this.loyaltyTier = "STANDARD";
     }
 
-    public Guest(String name, String icNumber, String phoneNumber, String confirmationNumber) {
+    public Guest(String name, String icPassport, String contactNo, String email) {
+        this.guestId = generateId();
         this.name = name;
-        this.icNumber = icNumber;
-        this.phoneNumber = phoneNumber;
-        this.confirmationNumber = confirmationNumber;
-        this.loyaltyProfile = new LoyaltyProfile();
+        this.icPassport = icPassport;
+        this.contactNo = contactNo;
+        this.email = email;
+        this.loyaltyTier = "STANDARD";
+    }
+
+    public Guest(String name, String icPassport, String contactNo, String email, String loyaltyTier) {
+        this.guestId = generateId();
+        this.name = name;
+        this.icPassport = icPassport;
+        this.contactNo = contactNo;
+        this.email = email;
+        this.loyaltyTier = loyaltyTier;
+    }
+
+    private static String generateId() {
+        return "G" + (idCounter++);
+    }
+
+    public static void updateIdCounter(int nextVal) {
+        if (nextVal > idCounter) {
+            idCounter = nextVal;
+        }
     }
 
     // --- Getters & Setters ---
+
+    public String getGuestId() {
+        return guestId;
+    }
+
+    public void setGuestId(String guestId) {
+        this.guestId = guestId;
+    }
 
     public String getName() {
         return name;
@@ -35,46 +70,57 @@ public class Guest implements Comparable<Guest> {
         this.name = name;
     }
 
-    public String getIcNumber() {
-        return icNumber;
+    public String getIcPassport() {
+        return icPassport;
     }
 
-    public void setIcNumber(String icNumber) {
-        this.icNumber = icNumber;
+    public void setIcPassport(String icPassport) {
+        this.icPassport = icPassport;
     }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
+    public String getContactNo() {
+        return contactNo;
     }
 
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
+    public void setContactNo(String contactNo) {
+        this.contactNo = contactNo;
     }
 
-    public String getConfirmationNumber() {
-        return confirmationNumber;
+    public String getEmail() {
+        return email;
     }
 
-    public void setConfirmationNumber(String confirmationNumber) {
-        this.confirmationNumber = confirmationNumber;
+    public void setEmail(String email) {
+        this.email = email;
     }
 
-    public LoyaltyProfile getLoyaltyProfile() {
-        return loyaltyProfile;
+    public String getLoyaltyTier() {
+        return loyaltyTier;
     }
 
-    public void setLoyaltyProfile(LoyaltyProfile loyaltyProfile) {
-        this.loyaltyProfile = loyaltyProfile;
+    public void setLoyaltyTier(String loyaltyTier) {
+        this.loyaltyTier = loyaltyTier;
     }
 
     /**
-     * Compares guests by confirmation number.
-     * This ordering is used by the BST for front-desk searching
-     * and by the PriorityQueue for VIP sorting.
+     * Returns the tier weight used in priority score calculations.
+     * STANDARD=0, SILVER=1, GOLD=2, PLATINUM=3, DIAMOND=4
      */
-    @Override
-    public int compareTo(Guest other) {
-        return this.confirmationNumber.compareTo(other.confirmationNumber);
+    public int getTierWeight() {
+        switch (loyaltyTier) {
+            case "DIAMOND":  return 4;
+            case "PLATINUM": return 3;
+            case "GOLD":     return 2;
+            case "SILVER":   return 1;
+            default:         return 0;
+        }
+    }
+
+    /**
+     * Checks if this guest qualifies for VIP priority (non-STANDARD tier).
+     */
+    public boolean isVIP() {
+        return !"STANDARD".equals(loyaltyTier);
     }
 
     @Override
@@ -82,14 +128,13 @@ public class Guest implements Comparable<Guest> {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         Guest other = (Guest) obj;
-        return confirmationNumber != null && confirmationNumber.equals(other.confirmationNumber);
+        return guestId != null && guestId.equals(other.guestId);
     }
 
     @Override
     public String toString() {
-        return "Guest{name='" + name + "', ic='" + icNumber
-                + "', phone='" + phoneNumber
-                + "', confirm='" + confirmationNumber
-                + "', loyalty=" + loyaltyProfile + "}";
+        return "Guest{id='" + guestId + "', name='" + name
+                + "', ic='" + icPassport + "', phone='" + contactNo
+                + "', email='" + email + "', tier=" + loyaltyTier + "}";
     }
 }

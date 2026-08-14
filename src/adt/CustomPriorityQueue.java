@@ -1,9 +1,12 @@
 package adt;
 
 /**
- * A custom Priority Queue implementation using a Binary Heap (Max-Heap).
+ * A custom Priority Queue implementation using a Binary Max-Heap.
  * For VIP & Loyalty Tier priority room allocation (Module 2).
  * No java.util collections used.
+ *
+ * The highest-priority element (max) stays at the root — O(1) inspection.
+ * Insertion (sift-up) and extraction (sift-down) operate in O(log n).
  *
  * @param <T> The type of elements, must implement Comparable.
  */
@@ -23,6 +26,10 @@ public class CustomPriorityQueue<T extends Comparable<T>> {
         size = 0;
     }
 
+    /**
+     * Inserts a new entry into the heap. Sifts up to maintain Max-Heap property.
+     * O(log n) time complexity.
+     */
     public void enqueue(T newEntry) {
         ensureCapacity();
         size++;
@@ -35,6 +42,10 @@ public class CustomPriorityQueue<T extends Comparable<T>> {
         heap[newIndex] = newEntry;
     }
 
+    /**
+     * Removes and returns the highest-priority element (root of the Max-Heap).
+     * O(log n) time complexity.
+     */
     public T dequeue() {
         if (isEmpty()) {
             return null;
@@ -49,6 +60,10 @@ public class CustomPriorityQueue<T extends Comparable<T>> {
         return root;
     }
 
+    /**
+     * Returns the highest-priority element without removing it.
+     * O(1) time complexity.
+     */
     public T peek() {
         if (isEmpty()) {
             return null;
@@ -69,6 +84,18 @@ public class CustomPriorityQueue<T extends Comparable<T>> {
             heap[i] = null;
         }
         size = 0;
+    }
+
+    /**
+     * Returns all heap items as a list (for display purposes).
+     * Order is not guaranteed to be priority order.
+     */
+    public CustomLinkedList<T> toList() {
+        CustomLinkedList<T> list = new CustomLinkedList<>();
+        for (int i = 1; i <= size; i++) {
+            list.add(heap[i]);
+        }
+        return list;
     }
 
     @SuppressWarnings("unchecked")

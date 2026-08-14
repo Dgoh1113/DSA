@@ -2,6 +2,7 @@ package boundary;
 
 import control.FrontDeskController;
 import control.LoyaltyController;
+import control.PartnerController;
 import control.StandardBookingController;
 import control.VIPAllocationController;
 import java.util.Scanner;
@@ -17,25 +18,32 @@ public class MainMenuUI {
     private VIPAllocationUI vipAllocationUI;
     private FrontDeskUI frontDeskUI;
     private LoyaltyUI loyaltyUI;
+    private PartnerUI partnerUI;
+    private UndoUI undoUI;
     private Scanner scanner;
 
     public MainMenuUI(StandardBookingController mod1,
                       VIPAllocationController mod2,
-                      FrontDeskController mod4,
-                      LoyaltyController mod5) {
+                      FrontDeskController mod3,
+                      LoyaltyController mod4,
+                      PartnerController mod5,
+                      control.UndoController undoController) {
         this.scanner = new Scanner(System.in);
         this.standardBookingUI = new StandardBookingUI(mod1, scanner);
         this.vipAllocationUI = new VIPAllocationUI(mod2, scanner);
-        this.frontDeskUI = new FrontDeskUI(mod4, scanner);
-        this.loyaltyUI = new LoyaltyUI(mod5, scanner);
+        this.frontDeskUI = new FrontDeskUI(mod3, scanner);
+        this.loyaltyUI = new LoyaltyUI(mod4, scanner);
+        this.partnerUI = new PartnerUI(mod5, scanner);
+        this.undoUI = new UndoUI(undoController, scanner);
     }
 
     public void start() {
         int choice = 0;
         do {
+            utility.UIUtils.clearScreen();
+            utility.UIUtils.printMainTitleHeader();
             displayMenu();
-            choice = scanner.nextInt();
-            scanner.nextLine(); // consume newline
+            choice = utility.UIUtils.safeReadInt(scanner);
 
             switch (choice) {
                 case 1:
@@ -50,25 +58,49 @@ public class MainMenuUI {
                 case 4:
                     loyaltyUI.show();
                     break;
+                case 5:
+                    partnerUI.show();
+                    break;
+                case 6:
+                    undoUI.show();
+                    break;
                 case 0:
-                    System.out.println("Thank you for using TARUMT Resorts System. Goodbye!");
+                    utility.UIUtils.clearScreen();
+                    System.out.println(utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "=====================================================================" + utility.UIUtils.RESET);
+                    System.out.println(utility.UIUtils.WHITE + utility.UIUtils.BOLD + "  Thank you for using TARUMT Resorts System." + utility.UIUtils.RESET);
+                    System.out.println(utility.UIUtils.CYAN + "  All session data saved. Goodbye!" + utility.UIUtils.RESET);
+                    System.out.println(utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "=====================================================================" + utility.UIUtils.RESET);
                     break;
                 default:
-                    System.out.println("Invalid option. Please try again.");
+                    System.out.println(utility.UIUtils.RED + "Invalid option. Please try again." + utility.UIUtils.RESET);
+                    utility.UIUtils.pressEnterToContinue(scanner);
             }
         } while (choice != 0);
     }
 
     private void displayMenu() {
-        System.out.println("\n========================================");
-        System.out.println("   TARUMT RESORTS MANAGEMENT SYSTEM");
-        System.out.println("========================================");
-        System.out.println("1. Walk-In / Standard Booking");
-        System.out.println("2. VIP Priority Allocation");
-        System.out.println("3. Front-Desk Service");
-        System.out.println("4. Loyalty & Rewards");
-        System.out.println("0. Exit");
-        System.out.println("========================================");
-        System.out.print("Enter your choice: ");
+        utility.UIUtils.printSectionHeader("CORE SYSTEM MODULES", utility.UIUtils.CYAN);
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Walk-In & Standard Booking  " + utility.UIUtils.CYAN + "[ Queue ADT ]" + utility.UIUtils.RESET);
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " VIP Priority Allocation     " + utility.UIUtils.YELLOW + "[ Max-Heap ADT ]" + utility.UIUtils.RESET);
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Front-Desk Service          " + utility.UIUtils.GREEN + "[ BST Search ADT ]" + utility.UIUtils.RESET);
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Loyalty & Rewards Program   " + utility.UIUtils.MAGENTA + "[ Doubly-Linked List + Sorting ]" + utility.UIUtils.RESET);
+        System.out.println("  " + utility.UIUtils.BLUE + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Strategic Partners & Refer  " + utility.UIUtils.BLUE + "[ Strategic Partner Network ]" + utility.UIUtils.RESET);
+
+        utility.UIUtils.printSectionHeader("CROSS-MODULE SYSTEM UTILITIES", utility.UIUtils.PURPLE);
+        System.out.println("  " + utility.UIUtils.PURPLE + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Transaction Undo Center     " + utility.UIUtils.PURPLE + "[ System Utility — Stack ADT ]" + utility.UIUtils.RESET);
+
+        utility.UIUtils.printSectionHeader("SYSTEM CONTROL", utility.UIUtils.RED);
+        System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Exit Application");
+        System.out.println("──────────────────────────────────────────────────────────");
+        System.out.print(utility.UIUtils.BOLD + "Enter your choice: " + utility.UIUtils.RESET);
+    }
+
+    private int readInt() {
+        while (!scanner.hasNextInt()) {
+            System.out.print("Please enter a valid number: ");
+            scanner.next();
+        }
+        return scanner.nextInt();
     }
 }
+

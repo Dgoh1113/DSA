@@ -1,12 +1,16 @@
 package boundary;
 
+import adt.DoublyLinkedList;
 import control.FrontDeskController;
+import entity.Guest;
+import entity.Reservation;
+import entity.Room;
 import java.util.Scanner;
 
 /**
- * Boundary: Front-Desk Service UI (Module 4).
- * Search screen for guest lookup by 8-digit confirmation number.
- * All System.out / Scanner interactions live here.
+ * Boundary: Front-Desk Service UI (Module 3).
+ * Console search screen for guest lookup, check-in/out, and reservation listing.
+ * All System.out / Scanner interactions live here — no business logic.
  */
 public class FrontDeskUI {
 
@@ -19,8 +23,262 @@ public class FrontDeskUI {
     }
 
     public void show() {
-        // TODO: Implement search form and report display
-        System.out.println("\n--- Front-Desk Service Module ---");
-        System.out.println("[Module 4 UI - To be implemented]");
+        boolean exitToMainMenu = false;
+        do {
+            utility.UIUtils.clearScreen();
+            utility.UIUtils.printModule3Header();
+            displayMenu();
+            int choice = utility.UIUtils.safeReadInt(scanner);
+
+            switch (choice) {
+                case 1:
+                    searchReservation();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 2:
+                    checkInGuest();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 3:
+                    checkOutGuest();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 4:
+                    cancelReservation();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 5:
+                    viewAllReservations();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 6:
+                    viewRoomStatus();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 0:
+                    exitToMainMenu = true;
+                    break;
+                default:
+                    System.out.println(utility.UIUtils.RED + "Invalid option. Please try again." + utility.UIUtils.RESET);
+                    utility.UIUtils.pressEnterToContinue(scanner);
+            }
+        } while (!exitToMainMenu);
+    }
+
+    private void displayMenu() {
+        utility.UIUtils.printSectionHeader("GUEST SEARCH & CHECK-IN SERVICES", utility.UIUtils.GREEN);
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Search Reservation (BST O(log n) Lookup)");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " Check-In Guest");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Check-Out Guest");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Cancel Reservation");
+
+        utility.UIUtils.printSectionHeader("SYSTEM RECORDS & INVENTORY", utility.UIUtils.GREEN);
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " View All Reservations (BST In-Order Sorted)");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Inventory Status");
+
+        utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
+        System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
+        System.out.println("──────────────────────────────────────────────────────────");
+        System.out.print(utility.UIUtils.BOLD + "Enter your choice: " + utility.UIUtils.RESET);
+    }
+
+    private void searchReservation() {
+        utility.UIUtils.printSubHeader("MODULE 3 > SEARCH RESERVATION", utility.UIUtils.GREEN);
+        System.out.print("Enter Confirmation No: ");
+        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+
+        Reservation res = controller.searchReservation(confirmNo);
+        if (res == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+        } else {
+            displayReservationDetails(res);
+        }
+    }
+
+    private void checkInGuest() {
+        utility.UIUtils.printSubHeader("MODULE 3 > CHECK-IN GUEST", utility.UIUtils.GREEN);
+        System.out.print("Enter Confirmation No: ");
+        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+
+        Reservation res = controller.searchReservation(confirmNo);
+        if (res == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+
+        if (!"CONFIRMED".equals(res.getBookingStatus()) && !"PENDING".equals(res.getBookingStatus())) {
+            System.out.println("Cannot check in. Current status: " + res.getBookingStatus());
+            return;
+        }
+
+        displayReservationDetails(res);
+        System.out.print("\nConfirm check-in? (Y/N): ");
+        String confirm = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+
+        if ("Y".equals(confirm)) {
+            boolean success = controller.checkIn(confirmNo);
+            if (success) {
+                System.out.println("\n*** CHECK-IN SUCCESSFUL ***");
+                System.out.println("Guest has been checked in.");
+            } else {
+                System.out.println("Check-in failed. Ensure rooms are available for PENDING status.");
+            }
+        } else {
+            System.out.println("Check-in cancelled.");
+        }
+    }
+
+    private void checkOutGuest() {
+        utility.UIUtils.printSubHeader("MODULE 3 > CHECK-OUT GUEST", utility.UIUtils.GREEN);
+        System.out.print("Enter Confirmation No: ");
+        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+
+        Reservation res = controller.searchReservation(confirmNo);
+        if (res == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+
+        if (!"CHECKED_IN".equals(res.getBookingStatus())) {
+            System.out.println("Cannot check out. Current status: " + res.getBookingStatus());
+            System.out.println("Only CHECKED_IN guests can be checked out.");
+            return;
+        }
+
+        displayReservationDetails(res);
+        System.out.print("\nConfirm check-out? (Y/N): ");
+        String confirm = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+
+        if ("Y".equals(confirm)) {
+            Reservation checkedOut = controller.checkOut(confirmNo);
+            if (checkedOut != null) {
+                System.out.println("\n*** CHECK-OUT SUCCESSFUL ***");
+                System.out.println("Room " + checkedOut.getAssignedRoomNo() + " is now AVAILABLE.");
+                System.out.println("Loyalty points accrued to Guest ID: " + checkedOut.getGuestId());
+            } else {
+                System.out.println("Check-out failed.");
+            }
+        } else {
+            System.out.println("Check-out cancelled.");
+        }
+    }
+
+    private void cancelReservation() {
+        utility.UIUtils.printSubHeader("MODULE 3 > CANCEL RESERVATION", utility.UIUtils.GREEN);
+        System.out.print("Enter Confirmation No: ");
+        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+
+        Reservation res = controller.searchReservation(confirmNo);
+        if (res == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+
+        displayReservationDetails(res);
+        System.out.print("\nConfirm cancellation? (Y/N): ");
+        String confirm = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+
+        if ("Y".equals(confirm)) {
+            boolean success = controller.cancelReservation(confirmNo);
+            if (success) {
+                System.out.println("\n*** RESERVATION CANCELLED ***");
+            } else {
+                System.out.println("Cancellation failed.");
+            }
+        } else {
+            System.out.println("Cancellation aborted.");
+        }
+    }
+
+    private void viewAllReservations() {
+        utility.UIUtils.printSubHeader("MODULE 3 > VIEW ALL RESERVATIONS (BST SORTED)", utility.UIUtils.GREEN);
+        System.out.println("Total Reservations: " + controller.getReservationCount());
+
+        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+        if (reservations.isEmpty()) {
+            System.out.println("No reservations in the system.");
+            return;
+        }
+
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
+        System.out.println("| No. | Confirmation   | Guest ID       | Room   | Type      | Status      |");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
+
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation res = reservations.getEntry(i);
+            String roomNo = (res.getAssignedRoomNo() != null) ? res.getAssignedRoomNo() : "---";
+            System.out.printf("| %-3d | %-14s | %-14s | %-6s | %-9s | %-11s |%n",
+                    i, res.getConfirmationNo(), res.getGuestId(),
+                    roomNo, res.getRoomType(), res.getBookingStatus());
+        }
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
+    }
+
+    private void viewRoomStatus() {
+        utility.UIUtils.printSubHeader("MODULE 3 > VIEW ROOM INVENTORY STATUS", utility.UIUtils.GREEN);
+        DoublyLinkedList<Room> rooms = controller.getRoomInventory();
+
+        System.out.println("+--------+-----------+---------------+-------------+");
+        System.out.println("| Room   | Type      | Nightly Rate  | Status      |");
+        System.out.println("+--------+-----------+---------------+-------------+");
+
+        int available = 0, occupied = 0, maintenance = 0;
+        for (int i = 1; i <= rooms.getNumberOfEntries(); i++) {
+            Room room = rooms.getEntry(i);
+            System.out.printf("| %-6s | %-9s | $%-12.2f | %-11s |%n",
+                    room.getRoomNo(), room.getRoomType(),
+                    room.getNightlyRate(), room.getStatus());
+            if ("AVAILABLE".equals(room.getStatus())) available++;
+            else if ("OCCUPIED".equals(room.getStatus())) occupied++;
+            else maintenance++;
+        }
+        System.out.println("+--------+-----------+---------------+-------------+");
+        System.out.printf("Summary: %d Available | %d Occupied | %d Maintenance%n",
+                available, occupied, maintenance);
+    }
+
+    private void displayReservationDetails(Reservation res) {
+        Guest guest = controller.findGuest(res.getGuestId());
+        Room room = controller.findRoom(res.getAssignedRoomNo());
+
+        System.out.println("\n+------------------------------------------+");
+        System.out.println("         RESERVATION DETAILS");
+        System.out.println("+------------------------------------------+");
+        System.out.println("  Confirmation No : " + res.getConfirmationNo());
+        System.out.println("  Booking Status  : " + res.getBookingStatus());
+        System.out.println("+------------------------------------------+");
+        System.out.println("  GUEST INFORMATION");
+        if (guest != null) {
+            System.out.println("  Guest ID        : " + guest.getGuestId());
+            System.out.println("  Name            : " + guest.getName());
+            System.out.println("  IC/Passport     : " + guest.getIcPassport());
+            System.out.println("  Contact         : " + guest.getContactNo());
+            System.out.println("  Email           : " + guest.getEmail());
+            System.out.println("  Loyalty Tier    : " + guest.getLoyaltyTier());
+        } else {
+            System.out.println("  Guest ID        : " + res.getGuestId());
+        }
+        System.out.println("+------------------------------------------+");
+        System.out.println("  ROOM & STAY DETAILS");
+        System.out.println("  Room Type       : " + res.getRoomType());
+        if (room != null) {
+            System.out.println("  Room Number     : " + room.getRoomNo());
+            System.out.println("  Nightly Rate    : $" + String.format("%.2f", room.getNightlyRate()));
+            System.out.println("  Room Status     : " + room.getStatus());
+        } else {
+            System.out.println("  Room Number     : " + (res.getAssignedRoomNo() != null ? res.getAssignedRoomNo() : "Not Assigned"));
+        }
+        System.out.println("  Check-In Date   : " + res.getCheckInDate());
+        System.out.println("  Check-Out Date  : " + res.getCheckOutDate());
+        System.out.println("  Priority Score  : " + res.getPriorityScore());
+        System.out.println("+------------------------------------------+");
+    }
+
+    private int readInt() {
+        while (!scanner.hasNextInt()) {
+            System.out.print("Please enter a valid number: ");
+            scanner.next();
+        }
+        return scanner.nextInt();
     }
 }
