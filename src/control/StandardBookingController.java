@@ -164,6 +164,19 @@ public class StandardBookingController {
         return loyaltyController.viewMemberProfile(guest.getGuestId());
     }
 
+    /** Registers a new STANDARD member without creating a room reservation. */
+    public Guest registerNewMember(String name, String icPassport, String contactNo, String email) {
+        Guest existingGuest = findGuestByContactNo(contactNo);
+        if (existingGuest != null) return existingGuest;
+
+        Guest guest = new Guest(name, icPassport, contactNo, email);
+        guestRegistry.add(guest);
+        if (loyaltyController != null) {
+            loyaltyController.viewMemberProfile(guest.getGuestId());
+        }
+        return guest;
+    }
+
     private String normalizeContactNo(String contactNo) {
         if (contactNo == null) return "";
         String digits = contactNo.replaceAll("[^0-9]", "");

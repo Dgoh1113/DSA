@@ -57,6 +57,18 @@ public class VIPAllocationController {
         Guest guest = new Guest(name, icPassport, contactNo, email, loyaltyTier);
         guestRegistry.add(guest);
 
+        return createVIPReservation(guest, roomType, checkInDate, checkOutDate);
+    }
+
+    /** Creates a VIP booking using an authenticated loyalty member profile. */
+    public Reservation addVIPBookingForGuest(Guest guest, String roomType,
+                                              String checkInDate, String checkOutDate) {
+        if (guest == null || !guest.isVIP()) return null;
+        return createVIPReservation(guest, roomType, checkInDate, checkOutDate);
+    }
+
+    private Reservation createVIPReservation(Guest guest, String roomType,
+                                               String checkInDate, String checkOutDate) {
         // Create reservation
         Reservation reservation = new Reservation(guest.getGuestId(), roomType, checkInDate, checkOutDate);
         reservation.setGuest(guest);
@@ -79,7 +91,8 @@ public class VIPAllocationController {
             undoController.recordAction(
                 "ADD_VIP_BOOKING",
                 "Module 2: VIP Priority Allocation",
-                "Added VIP Booking: " + name + " (" + loyaltyTier + ", Conf #" + reservation.getConfirmationNo() + ")",
+                "Added VIP Booking: " + guest.getName() + " (" + guest.getLoyaltyTier()
+                        + ", Conf #" + reservation.getConfirmationNo() + ")",
                 () -> {
                     reservation.setBookingStatus("CANCELLED");
                     searchTree.delete(reservation);

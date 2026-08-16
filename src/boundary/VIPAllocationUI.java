@@ -3,6 +3,7 @@ package boundary;
 import adt.DoublyLinkedList;
 import control.VIPAllocationController;
 import control.VIPAllocationController.VIPReservation;
+import entity.Guest;
 import entity.Reservation;
 import java.util.Scanner;
 
@@ -15,10 +16,15 @@ public class VIPAllocationUI {
 
     private VIPAllocationController controller;
     private Scanner scanner;
+    private Guest authenticatedGuest;
 
     public VIPAllocationUI(VIPAllocationController controller, Scanner scanner) {
         this.controller = controller;
         this.scanner = scanner;
+    }
+
+    public void setAuthenticatedGuest(Guest authenticatedGuest) {
+        this.authenticatedGuest = authenticatedGuest;
     }
 
     public void show() {
@@ -77,6 +83,10 @@ public class VIPAllocationUI {
     private boolean addVIPBooking() {
         utility.UIUtils.printSubHeader("MODULE 2 > ADD VIP BOOKING", utility.UIUtils.YELLOW);
         System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type 'b' to go BACK | Type '0' to QUIT TO MAIN MENU | Type 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
+
+        if (authenticatedGuest != null) {
+            return addAuthenticatedVIPBooking();
+        }
 
         String name = "";
         String icPassport = "";
@@ -185,6 +195,75 @@ public class VIPAllocationUI {
         System.out.println("  Check-In        : " + res.getCheckInDate());
         System.out.println("  Check-Out       : " + res.getCheckOutDate());
         System.out.println("  Status          : " + res.getBookingStatus());
+        System.out.println("  VIP Queue Size  : " + controller.getVIPQueueSize());
+        System.out.println("+------------------------------------------+");
+        return false;
+    }
+
+    private boolean addAuthenticatedVIPBooking() {
+        System.out.println("  VIP Member      : " + authenticatedGuest.getName());
+        System.out.println("  Guest ID        : " + authenticatedGuest.getGuestId());
+        System.out.println("  Loyalty Tier    : " + authenticatedGuest.getLoyaltyTier());
+        System.out.println("  Contact Number  : " + authenticatedGuest.getContactNo());
+        System.out.println("\n  Only the room and stay dates are required.\n");
+
+        String roomType = "";
+        String checkIn = "";
+        String checkOut = "";
+        int step = 0;
+        while (step <= 2) {
+            switch (step) {
+                case 0: {
+                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+                    utility.StepResult result = utility.ValidationUtils.readValidRoomTypeStep(
+                            scanner, "Step 1/3 - Preferred Room", roomType);
+                    if (result.isGoBack() || result.isCancel()) return false;
+                    if (result.isQuitToMain()) return true;
+                    roomType = result.getValue();
+                    step++;
+                    break;
+                }
+                case 1: {
+                    utility.StepResult result = utility.ValidationUtils.readValidDateStep(
+                            scanner, "Step 2/3 - Check-In (YYYY-MM-DD)", checkIn);
+                    if (result.isGoBack()) { step--; break; }
+                    if (result.isCancel()) return false;
+                    if (result.isQuitToMain()) return true;
+                    checkIn = result.getValue();
+                    step++;
+                    break;
+                }
+                case 2: {
+                    utility.StepResult result = utility.ValidationUtils.readValidCheckOutDateStep(
+                            scanner, "Step 3/3 - Check-Out Date", checkIn, checkOut);
+                    if (result.isGoBack()) { step--; break; }
+                    if (result.isCancel()) return false;
+                    if (result.isQuitToMain()) return true;
+                    checkOut = result.getValue();
+                    step++;
+                    break;
+                }
+            }
+        }
+
+        Reservation reservation = controller.addVIPBookingForGuest(
+                authenticatedGuest, roomType, checkIn, checkOut);
+        if (reservation == null) {
+            System.out.println("\n  [!] Booking failed because this account is not VIP eligible.");
+            return false;
+        }
+
+        System.out.println("\n+------------------------------------------+");
+        System.out.println("  VIP BOOKING REGISTERED!");
+        System.out.println("+------------------------------------------+");
+        System.out.println("  Confirmation No : " + reservation.getConfirmationNo());
+        System.out.println("  Guest ID        : " + reservation.getGuestId());
+        System.out.println("  Loyalty Tier    : " + authenticatedGuest.getLoyaltyTier());
+        System.out.println("  Priority Score  : " + reservation.getPriorityScore());
+        System.out.println("  Room Type       : " + reservation.getRoomType());
+        System.out.println("  Check-In        : " + reservation.getCheckInDate());
+        System.out.println("  Check-Out       : " + reservation.getCheckOutDate());
+        System.out.println("  Status          : " + reservation.getBookingStatus());
         System.out.println("  VIP Queue Size  : " + controller.getVIPQueueSize());
         System.out.println("+------------------------------------------+");
         return false;

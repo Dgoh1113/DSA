@@ -161,7 +161,7 @@ public class Main {
         // 3. Create Boundary (UI layer)
         //    — inject the controllers
         // ============================
-        MainMenuUI mainMenu = new MainMenuUI(mod1, mod2, mod3, mod4, mod5_partner, undoController);
+        MainMenuUI mainMenu = new MainMenuUI(mod1, mod2, mod3, mod4, mod5_partner);
 
         // ============================
         // 4. Start the application

@@ -247,6 +247,23 @@ public class LoyaltyController {
         return account;
     }
 
+    /** Returns true when a member has positive points expiring within the given period. */
+    public boolean hasPointsExpiringWithinDays(String memberId, int daysThreshold) {
+        LoyaltyAccount account = findAccount(memberId);
+        if (account == null || account.getTotalPoints() <= 0
+                || account.getPointsExpiryDate() == null) {
+            return false;
+        }
+        try {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            java.time.LocalDate expiry = java.time.LocalDate.parse(account.getPointsExpiryDate());
+            java.time.LocalDate threshold = today.plusDays(daysThreshold);
+            return !expiry.isBefore(today) && !expiry.isAfter(threshold);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** Returns the guest details linked to a loyalty member ID. */
     public Guest viewMemberGuest(String memberId) {
         return findGuest(memberId);

@@ -2,6 +2,7 @@ package boundary;
 
 import adt.DoublyLinkedList;
 import control.StandardBookingController;
+import entity.Guest;
 import entity.Reservation;
 import java.util.Scanner;
 
@@ -14,10 +15,15 @@ public class StandardBookingUI {
 
     private StandardBookingController controller;
     private Scanner scanner;
+    private Guest authenticatedGuest;
 
     public StandardBookingUI(StandardBookingController controller, Scanner scanner) {
         this.controller = controller;
         this.scanner = scanner;
+    }
+
+    public void setAuthenticatedGuest(Guest authenticatedGuest) {
+        this.authenticatedGuest = authenticatedGuest;
     }
 
     public void show() {
@@ -85,13 +91,18 @@ public class StandardBookingUI {
         String checkIn = "";
         String checkOut = "";
 
-        utility.StepResult phoneResult = utility.ValidationUtils.readValidContactNoStep(
-                scanner, "Phone Number (loyalty lookup) ", contactNo);
-        if (phoneResult.isGoBack() || phoneResult.isCancel()) return false;
-        if (phoneResult.isQuitToMain()) return true;
-        contactNo = phoneResult.getValue();
-
-        entity.Guest existingGuest = controller.findGuestByContactNo(contactNo);
+        Guest existingGuest;
+        if (authenticatedGuest != null) {
+            existingGuest = authenticatedGuest;
+            contactNo = authenticatedGuest.getContactNo();
+        } else {
+            utility.StepResult phoneResult = utility.ValidationUtils.readValidContactNoStep(
+                    scanner, "Phone Number (loyalty lookup) ", contactNo);
+            if (phoneResult.isGoBack() || phoneResult.isCancel()) return false;
+            if (phoneResult.isQuitToMain()) return true;
+            contactNo = phoneResult.getValue();
+            existingGuest = controller.findGuestByContactNo(contactNo);
+        }
         boolean returningGuest = existingGuest != null;
         if (returningGuest) {
             name = existingGuest.getName();

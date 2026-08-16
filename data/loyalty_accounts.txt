@@ -9,3 +9,4 @@ G1007|400|STANDARD|2027-08-16|+400 pts (SUITE room stay)
 G1008|2000|GOLD|2027-08-16|+2000 pts (Stay: 4 nights @ $500.0/night);;;Tier upgrade: STANDARD -> GOLD
 G1009|3000|GOLD|2027-08-16|+3000 pts (Stay: 6 nights @ $500.0/night);;;Tier upgrade: DIAMOND -> GOLD
 G1010|4400|GOLD|2027-08-16|+3000 pts (Stay: 6 nights @ $500.0/night);;;Tier upgrade: STANDARD -> GOLD;;;+1400 pts (Stay: 7 nights @ $200.0/night)
+G1011|1000|SILVER|2027-08-16|+1000 pts (Stay: 2 nights @ $500.0/night);;;Tier upgrade: STANDARD -> SILVER
