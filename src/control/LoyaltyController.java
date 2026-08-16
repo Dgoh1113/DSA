@@ -67,6 +67,14 @@ public class LoyaltyController {
         checkAndUpgradeTier(guestId);
     }
 
+    /** Credits the loyalty account belonging to a registered phone number. */
+    public void accruePointsByContactNo(String contactNo, double nightlyRate, int nights) {
+        Guest guest = findGuestByContactNo(contactNo);
+        if (guest != null) {
+            accruePoints(guest.getGuestId(), nightlyRate, nights);
+        }
+    }
+
     /**
      * Evaluates the guest's total points against tier thresholds
      * and upgrades their tier if qualified.
@@ -239,6 +247,11 @@ public class LoyaltyController {
         return account;
     }
 
+    /** Returns the guest details linked to a loyalty member ID. */
+    public Guest viewMemberGuest(String memberId) {
+        return findGuest(memberId);
+    }
+
     /**
      * Returns all loyalty accounts.
      */
@@ -295,6 +308,27 @@ public class LoyaltyController {
             }
         }
         return null;
+    }
+
+    private Guest findGuestByContactNo(String contactNo) {
+        String normalizedContact = normalizeContactNo(contactNo);
+        if (normalizedContact.isEmpty()) return null;
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest != null
+                    && normalizedContact.equals(normalizeContactNo(guest.getContactNo()))) {
+                return guest;
+            }
+        }
+        return null;
+    }
+
+    private String normalizeContactNo(String contactNo) {
+        if (contactNo == null) return "";
+        String digits = contactNo.replaceAll("[^0-9]", "");
+        if (digits.startsWith("0060")) digits = digits.substring(2);
+        if (digits.startsWith("60")) digits = "0" + digits.substring(2);
+        return digits;
     }
 
     /** Enrols newly registered guests so they appear in loyalty member listings immediately. */

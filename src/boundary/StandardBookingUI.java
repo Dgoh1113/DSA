@@ -85,11 +85,41 @@ public class StandardBookingUI {
         String checkIn = "";
         String checkOut = "";
 
-        int step = 0;
-        while (step >= 0 && step <= 6) {
+        utility.StepResult phoneResult = utility.ValidationUtils.readValidContactNoStep(
+                scanner, "Phone Number (loyalty lookup) ", contactNo);
+        if (phoneResult.isGoBack() || phoneResult.isCancel()) return false;
+        if (phoneResult.isQuitToMain()) return true;
+        contactNo = phoneResult.getValue();
+
+        entity.Guest existingGuest = controller.findGuestByContactNo(contactNo);
+        boolean returningGuest = existingGuest != null;
+        if (returningGuest) {
+            name = existingGuest.getName();
+            icPassport = existingGuest.getIcPassport();
+            email = existingGuest.getEmail();
+            contactNo = existingGuest.getContactNo();
+
+            System.out.println("\n  Registered phone number found. Existing details loaded:");
+            System.out.println("  Guest ID        : " + existingGuest.getGuestId());
+            System.out.println("  Name            : " + existingGuest.getName());
+            System.out.println("  IC / Passport   : " + existingGuest.getIcPassport());
+            System.out.println("  Contact Number  : " + existingGuest.getContactNo());
+            System.out.println("  Email           : " + existingGuest.getEmail());
+            System.out.println("  Loyalty Tier    : " + existingGuest.getLoyaltyTier());
+            entity.LoyaltyAccount loyaltyAccount =
+                    controller.findLoyaltyAccountByContactNo(contactNo);
+            System.out.println("  Loyalty Points  : "
+                    + (loyaltyAccount == null ? 0 : loyaltyAccount.getTotalPoints()));
+            System.out.println("\n  Only the room and stay dates are required.\n");
+        } else {
+            System.out.println("\n  Phone number is not registered. Please enter the new guest details.\n");
+        }
+
+        int step = returningGuest ? 3 : 0;
+        while (step >= 0 && step <= 5) {
             switch (step) {
                 case 0: {
-                    utility.StepResult res = utility.ValidationUtils.readValidNameStep(scanner, "Step 1/7 - Guest Name       ", name);
+                    utility.StepResult res = utility.ValidationUtils.readValidNameStep(scanner, "Step 2/7 - Guest Name       ", name);
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     name = res.getValue();
@@ -97,7 +127,7 @@ public class StandardBookingUI {
                     break;
                 }
                 case 1: {
-                    utility.StepResult res = utility.ValidationUtils.readValidIcPassportStep(scanner, "Step 2/7 - IC / Passport No ", icPassport);
+                    utility.StepResult res = utility.ValidationUtils.readValidIcPassportStep(scanner, "Step 3/7 - IC / Passport No ", icPassport);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
@@ -106,15 +136,6 @@ public class StandardBookingUI {
                     break;
                 }
                 case 2: {
-                    utility.StepResult res = utility.ValidationUtils.readValidContactNoStep(scanner, "Step 3/7 - Contact Number   ", contactNo);
-                    if (res.isGoBack()) { step--; break; }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    contactNo = res.getValue();
-                    step++;
-                    break;
-                }
-                case 3: {
                     utility.StepResult res = utility.ValidationUtils.readValidEmailStep(scanner, "Step 4/7 - Email Address    ", email);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
@@ -123,17 +144,21 @@ public class StandardBookingUI {
                     step++;
                     break;
                 }
-                case 4: {
+                case 3: {
                     System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
                     utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 5/7 - Preferred Room   ", roomType);
-                    if (res.isGoBack()) { step--; break; }
+                    if (res.isGoBack()) {
+                        if (returningGuest) return false;
+                        step--;
+                        break;
+                    }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     roomType = res.getValue();
                     step++;
                     break;
                 }
-                case 5: {
+                case 4: {
                     utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 6/7 - Check-In (YYYY-MM-DD) ", checkIn);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
@@ -142,7 +167,7 @@ public class StandardBookingUI {
                     step++;
                     break;
                 }
-                case 6: {
+                case 5: {
                     utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 7/7 - Check-Out Date   ", checkIn, checkOut);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;

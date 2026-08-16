@@ -2,6 +2,7 @@ package boundary;
 
 import adt.DoublyLinkedList;
 import control.LoyaltyController;
+import entity.Guest;
 import entity.LoyaltyAccount;
 import entity.RedemptionTransaction;
 import java.util.Scanner;
@@ -100,10 +101,24 @@ public class LoyaltyUI {
             return;
         }
 
+        Guest guest = controller.viewMemberGuest(account.getMemberId());
+
         System.out.println("\n+------------------------------------------+");
         System.out.println("         LOYALTY MEMBER PROFILE");
         System.out.println("+------------------------------------------+");
         System.out.println("  Member ID       : " + account.getMemberId());
+        System.out.println("+------------------------------------------+");
+        System.out.println("  GUEST INFORMATION");
+        if (guest != null) {
+            System.out.println("  Name            : " + guest.getName());
+            System.out.println("  IC/Passport     : " + guest.getIcPassport());
+            System.out.println("  Contact Number  : " + guest.getContactNo());
+            System.out.println("  Email           : " + guest.getEmail());
+        } else {
+            System.out.println("  Guest details are unavailable.");
+        }
+        System.out.println("+------------------------------------------+");
+        System.out.println("  LOYALTY INFORMATION");
         System.out.println("  Total Points    : " + account.getTotalPoints());
         System.out.println("  Tier Status     : " + account.getTierStatus());
         System.out.println("  Points Expiry   : " + (account.getPointsExpiryDate() != null ? account.getPointsExpiryDate() : "N/A"));

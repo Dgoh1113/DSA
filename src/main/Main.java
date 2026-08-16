@@ -142,6 +142,7 @@ public class Main {
         VIPAllocationController   mod2 = new VIPAllocationController(vipQueue, masterRegistry, roomInventory, searchTree);
 
         mod1.setUndoController(undoController);
+        mod1.setLoyaltyController(mod4);
         mod2.setUndoController(undoController);
         mod3.setUndoController(undoController);
         mod4.setUndoController(undoController);

@@ -128,8 +128,11 @@ public class FrontDeskController {
             if (loyaltyController != null) {
                 int nights = calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate());
                 if (nights <= 0) nights = 1; // minimum 1 night
-                loyaltyController.accruePoints(reservation.getGuestId(),
-                                                room.getNightlyRate(), nights);
+                Guest guest = findGuest(reservation.getGuestId());
+                if (guest != null) {
+                    loyaltyController.accruePointsByContactNo(guest.getContactNo(),
+                                                              room.getNightlyRate(), nights);
+                }
             }
         }
 

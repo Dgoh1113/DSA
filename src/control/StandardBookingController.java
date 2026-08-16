@@ -4,6 +4,7 @@ import adt.BinarySearchTree;
 import adt.DoublyLinkedList;
 import adt.LinkedQueue;
 import entity.Guest;
+import entity.LoyaltyAccount;
 import entity.Reservation;
 import entity.Room;
 
@@ -26,6 +27,7 @@ public class StandardBookingController {
     private BinarySearchTree<Reservation> searchTree;
 
     private UndoController undoController;
+    private LoyaltyController loyaltyController;
 
     private static int arrivalCounter = 0; // Tracks arrival order across modules
 
@@ -43,6 +45,10 @@ public class StandardBookingController {
         this.undoController = undoController;
     }
 
+    public void setLoyaltyController(LoyaltyController loyaltyController) {
+        this.loyaltyController = loyaltyController;
+    }
+
     /**
      * Registers a walk-in guest and creates a PENDING reservation.
      * The guest is added to the guest registry and the reservation
@@ -53,9 +59,12 @@ public class StandardBookingController {
     public Reservation registerWalkIn(String name, String icPassport, String contactNo,
                                        String email, String roomType,
                                        String checkInDate, String checkOutDate) {
-        // Create guest
-        Guest guest = new Guest(name, icPassport, contactNo, email);
-        guestRegistry.add(guest);
+        // Reuse the existing guest and loyalty identity when the phone is registered.
+        Guest guest = findGuestByContactNo(contactNo);
+        if (guest == null) {
+            guest = new Guest(name, icPassport, contactNo, email);
+            guestRegistry.add(guest);
+        }
 
         // Create reservation
         Reservation reservation = new Reservation(guest.getGuestId(), roomType, checkInDate, checkOutDate);
@@ -132,6 +141,35 @@ public class StandardBookingController {
         }
 
         return reservation;
+    }
+
+    /** Finds a registered guest by phone number, ignoring common formatting characters. */
+    public Guest findGuestByContactNo(String contactNo) {
+        String normalizedContact = normalizeContactNo(contactNo);
+        if (normalizedContact.isEmpty()) return null;
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest != null
+                    && normalizedContact.equals(normalizeContactNo(guest.getContactNo()))) {
+                return guest;
+            }
+        }
+        return null;
+    }
+
+    /** Returns the loyalty profile tied to a registered phone number. */
+    public LoyaltyAccount findLoyaltyAccountByContactNo(String contactNo) {
+        Guest guest = findGuestByContactNo(contactNo);
+        if (guest == null || loyaltyController == null) return null;
+        return loyaltyController.viewMemberProfile(guest.getGuestId());
+    }
+
+    private String normalizeContactNo(String contactNo) {
+        if (contactNo == null) return "";
+        String digits = contactNo.replaceAll("[^0-9]", "");
+        if (digits.startsWith("0060")) digits = digits.substring(2);
+        if (digits.startsWith("60")) digits = "0" + digits.substring(2);
+        return digits;
     }
 
     private Reservation dequeueNextActiveReservation() {
