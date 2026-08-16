@@ -159,6 +159,7 @@ public class LoyaltyController {
      * @return A new DoublyLinkedList sorted by points (highest first).
      */
     public DoublyLinkedList<LoyaltyAccount> generateTopEarnersReport() {
+        ensureAllGuestsHaveAccounts();
         return SortAlgorithms.mergeSort(loyaltyAccounts,
                 (a, b) -> Integer.compare(b.getTotalPoints(), a.getTotalPoints()));
     }
@@ -196,6 +197,7 @@ public class LoyaltyController {
      * @return Sorted list of accounts matching the tier.
      */
     public DoublyLinkedList<LoyaltyAccount> generateTierReport(String tier) {
+        ensureAllGuestsHaveAccounts();
         DoublyLinkedList<LoyaltyAccount> filtered = new DoublyLinkedList<>();
         for (int i = 1; i <= loyaltyAccounts.getNumberOfEntries(); i++) {
             LoyaltyAccount account = loyaltyAccounts.getEntry(i);
@@ -225,13 +227,23 @@ public class LoyaltyController {
      * Views a specific member's loyalty profile.
      */
     public LoyaltyAccount viewMemberProfile(String memberId) {
-        return findAccount(memberId);
+        LoyaltyAccount account = findAccount(memberId);
+        if (account != null) return account;
+
+        Guest guest = findGuest(memberId);
+        if (guest == null) return null;
+
+        account = new LoyaltyAccount(guest.getGuestId());
+        account.setTierStatus(guest.getLoyaltyTier());
+        loyaltyAccounts.add(account);
+        return account;
     }
 
     /**
      * Returns all loyalty accounts.
      */
     public DoublyLinkedList<LoyaltyAccount> getAllAccounts() {
+        ensureAllGuestsHaveAccounts();
         return loyaltyAccounts;
     }
 
@@ -243,9 +255,11 @@ public class LoyaltyController {
      * Finds an existing loyalty account by member/guest ID.
      */
     public LoyaltyAccount findAccount(String memberId) {
+        if (memberId == null) return null;
+        String normalizedId = memberId.trim();
         for (int i = 1; i <= loyaltyAccounts.getNumberOfEntries(); i++) {
             LoyaltyAccount account = loyaltyAccounts.getEntry(i);
-            if (account.getMemberId().equals(memberId)) {
+            if (account.getMemberId().equalsIgnoreCase(normalizedId)) {
                 return account;
             }
         }
@@ -272,13 +286,27 @@ public class LoyaltyController {
      * Finds a guest by guestId.
      */
     private Guest findGuest(String guestId) {
+        if (guestId == null) return null;
+        String normalizedId = guestId.trim();
         for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
             Guest guest = guestRegistry.getEntry(i);
-            if (guest.getGuestId().equals(guestId)) {
+            if (guest.getGuestId().equalsIgnoreCase(normalizedId)) {
                 return guest;
             }
         }
         return null;
+    }
+
+    /** Enrols newly registered guests so they appear in loyalty member listings immediately. */
+    private void ensureAllGuestsHaveAccounts() {
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest != null && findAccount(guest.getGuestId()) == null) {
+                LoyaltyAccount account = new LoyaltyAccount(guest.getGuestId());
+                account.setTierStatus(guest.getLoyaltyTier());
+                loyaltyAccounts.add(account);
+            }
+        }
     }
 
     /**

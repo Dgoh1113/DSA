@@ -59,6 +59,7 @@ public class FilePersistenceUtils {
                                    DoublyLinkedList<Room> roomInventory,
                                    LinkedQueue<Reservation> standardQueue,
                                    BinaryMaxHeap<VIPReservation> vipQueue,
+                                   BinarySearchTree<Reservation> searchTree,
                                    DoublyLinkedList<LoyaltyAccount> loyaltyAccounts,
                                    DoublyLinkedList<RedemptionTransaction> redemptionLog,
                                    DoublyLinkedList<Partner> partnerRegistry,
@@ -68,6 +69,7 @@ public class FilePersistenceUtils {
         saveRooms(roomInventory);
         saveStandardQueue(standardQueue);
         saveVIPQueue(vipQueue);
+        saveReservations(searchTree);
         saveLoyaltyAccounts(loyaltyAccounts);
         saveRedemptions(redemptionLog);
         savePartners(partnerRegistry);
@@ -126,6 +128,18 @@ public class FilePersistenceUtils {
             }
         } catch (Exception e) {
             System.err.println("Error saving vip_queue.txt: " + e.getMessage());
+        }
+    }
+
+    private static void saveReservations(BinarySearchTree<Reservation> searchTree) {
+        try (PrintWriter writer = new PrintWriter(new FileWriter(DATA_DIR + "/reservations.txt"))) {
+            DoublyLinkedList<Reservation> list = searchTree.inOrderTraversal();
+            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
+                Reservation reservation = list.getEntry(i);
+                if (reservation != null) writer.println(serializeReservation(reservation));
+            }
+        } catch (Exception e) {
+            System.err.println("Error saving reservations.txt: " + e.getMessage());
         }
     }
 
@@ -216,8 +230,13 @@ public class FilePersistenceUtils {
                                    DoublyLinkedList<CustomerReferral> referralLog) {
         loadGuests(guestRegistry);
         loadRooms(roomInventory);
-        loadStandardQueue(standardQueue, searchTree);
-        loadVIPQueue(vipQueue, searchTree);
+        File reservationsFile = new File(DATA_DIR + "/reservations.txt");
+        if (reservationsFile.exists()) {
+            loadReservations(guestRegistry, standardQueue, vipQueue, searchTree);
+        } else {
+            loadStandardQueue(standardQueue, searchTree, guestRegistry);
+            loadVIPQueue(vipQueue, searchTree, guestRegistry);
+        }
         loadLoyaltyAccounts(loyaltyAccounts);
         loadRedemptions(redemptionLog);
         loadPartners(partnerRegistry);
@@ -270,7 +289,8 @@ public class FilePersistenceUtils {
         }
     }
 
-    private static void loadStandardQueue(LinkedQueue<Reservation> queue, BinarySearchTree<Reservation> searchTree) {
+    private static void loadStandardQueue(LinkedQueue<Reservation> queue, BinarySearchTree<Reservation> searchTree,
+                                          DoublyLinkedList<Guest> guests) {
         File file = new File(DATA_DIR + "/standard_queue.txt");
         if (!file.exists()) return;
 
@@ -281,6 +301,7 @@ public class FilePersistenceUtils {
                 if (line.trim().isEmpty()) continue;
                 Reservation r = deserializeReservation(line);
                 if (r != null) {
+                    r.setGuest(findGuest(guests, r.getGuestId()));
                     queue.enqueue(r);
                     searchTree.insert(r);
                     try {
@@ -295,7 +316,8 @@ public class FilePersistenceUtils {
         }
     }
 
-    private static void loadVIPQueue(BinaryMaxHeap<VIPReservation> vipQueue, BinarySearchTree<Reservation> searchTree) {
+    private static void loadVIPQueue(BinaryMaxHeap<VIPReservation> vipQueue, BinarySearchTree<Reservation> searchTree,
+                                     DoublyLinkedList<Guest> guests) {
         File file = new File(DATA_DIR + "/vip_queue.txt");
         if (!file.exists()) return;
 
@@ -306,6 +328,7 @@ public class FilePersistenceUtils {
                 if (line.trim().isEmpty()) continue;
                 Reservation r = deserializeReservation(line);
                 if (r != null) {
+                    r.setGuest(findGuest(guests, r.getGuestId()));
                     vipQueue.enqueue(new VIPReservation(r));
                     searchTree.insert(r);
                     try {
@@ -318,6 +341,43 @@ public class FilePersistenceUtils {
         } catch (Exception e) {
             System.err.println("Error loading vip_queue.txt: " + e.getMessage());
         }
+    }
+
+    private static void loadReservations(DoublyLinkedList<Guest> guests,
+                                         LinkedQueue<Reservation> standardQueue,
+                                         BinaryMaxHeap<VIPReservation> vipQueue,
+                                         BinarySearchTree<Reservation> searchTree) {
+        File file = new File(DATA_DIR + "/reservations.txt");
+        int maxConf = 10000000;
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+                Reservation reservation = deserializeReservation(line);
+                if (reservation == null) continue;
+                reservation.setGuest(findGuest(guests, reservation.getGuestId()));
+                searchTree.insert(reservation);
+                if ("PENDING".equals(reservation.getBookingStatus())) {
+                    if (reservation.getPriorityScore() > 0) vipQueue.enqueue(new VIPReservation(reservation));
+                    else standardQueue.enqueue(reservation);
+                }
+                try {
+                    int num = Integer.parseInt(reservation.getConfirmationNo());
+                    if (num >= maxConf) maxConf = num + 1;
+                } catch (Exception ignored) {}
+            }
+            Reservation.updateConfirmCounter(maxConf);
+        } catch (Exception e) {
+            System.err.println("Error loading reservations.txt: " + e.getMessage());
+        }
+    }
+
+    private static Guest findGuest(DoublyLinkedList<Guest> guests, String guestId) {
+        for (int i = 1; i <= guests.getNumberOfEntries(); i++) {
+            Guest guest = guests.getEntry(i);
+            if (guest != null && guest.getGuestId().equals(guestId)) return guest;
+        }
+        return null;
     }
 
     private static void loadLoyaltyAccounts(DoublyLinkedList<LoyaltyAccount> list) {

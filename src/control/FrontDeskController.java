@@ -169,6 +169,11 @@ public class FrontDeskController {
             return false;
         }
 
+        if (!"PENDING".equals(reservation.getBookingStatus())
+                && !"CONFIRMED".equals(reservation.getBookingStatus())) {
+            return false;
+        }
+
         String prevStatus = reservation.getBookingStatus();
         reservation.setBookingStatus("CANCELLED");
 
@@ -208,6 +213,37 @@ public class FrontDeskController {
      */
     public DoublyLinkedList<Reservation> getAllReservationsSorted() {
         return searchTree.inOrderTraversal();
+    }
+
+    /** Returns reservations matching a booking status, sorted by confirmation number. */
+    public DoublyLinkedList<Reservation> getReservationsByStatus(String bookingStatus) {
+        DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
+        if (bookingStatus == null) return matches;
+
+        DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null
+                    && bookingStatus.equalsIgnoreCase(reservation.getBookingStatus())) {
+                matches.add(reservation);
+            }
+        }
+        return matches;
+    }
+
+    /** Returns bookings that have not started and can still be cancelled. */
+    public DoublyLinkedList<Reservation> getCancellableReservations() {
+        DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null
+                    && ("PENDING".equals(reservation.getBookingStatus())
+                    || "CONFIRMED".equals(reservation.getBookingStatus()))) {
+                matches.add(reservation);
+            }
+        }
+        return matches;
     }
 
     /**

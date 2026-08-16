@@ -1,2 +1,9 @@
 G1000|12000|DIAMOND||Initial Seed Points
-G1001|3500|GOLD||Initial Seed Points
+G1001|3000|GOLD||Initial Seed Points;;;-500 pts (Redeemed: Room Upgrade)
+G1002|0|STANDARD||
+G1003|0|STANDARD||
+G1004|200|STANDARD|2027-08-16|+200 pts (Stay: 1 nights @ $200.0/night)
+G1005|0|STANDARD||
+G1006|250|STANDARD|2027-08-16|+250 pts (DELUXE room stay)
+G1007|400|STANDARD|2027-08-16|+400 pts (SUITE room stay)
+G1008|2000|GOLD|2027-08-16|+2000 pts (Stay: 4 nights @ $500.0/night);;;Tier upgrade: STANDARD -> GOLD

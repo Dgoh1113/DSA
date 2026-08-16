@@ -84,6 +84,12 @@ public class FrontDeskUI {
 
     private void searchReservation() {
         utility.UIUtils.printSubHeader("MODULE 3 > SEARCH RESERVATION", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+        if (reservations.isEmpty()) {
+            System.out.println("No reservations are currently available to search.");
+            return;
+        }
+        displayReservationChoices("ALL RESERVATIONS", reservations, true);
         System.out.print("Enter Confirmation No: ");
         String confirmNo = utility.UIUtils.safeReadLine(scanner);
 
@@ -97,6 +103,12 @@ public class FrontDeskUI {
 
     private void checkInGuest() {
         utility.UIUtils.printSubHeader("MODULE 3 > CHECK-IN GUEST", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> eligible = controller.getReservationsByStatus("CONFIRMED");
+        if (eligible.isEmpty()) {
+            System.out.println("No confirmed bookings are currently available for check-in.");
+            return;
+        }
+        displayEligibleReservations("BOOKINGS AVAILABLE FOR CHECK-IN", eligible);
         System.out.print("Enter Confirmation No: ");
         String confirmNo = utility.UIUtils.safeReadLine(scanner);
 
@@ -106,7 +118,7 @@ public class FrontDeskUI {
             return;
         }
 
-        if (!"CONFIRMED".equals(res.getBookingStatus()) && !"PENDING".equals(res.getBookingStatus())) {
+        if (!"CONFIRMED".equals(res.getBookingStatus())) {
             System.out.println("Cannot check in. Current status: " + res.getBookingStatus());
             return;
         }
@@ -130,6 +142,12 @@ public class FrontDeskUI {
 
     private void checkOutGuest() {
         utility.UIUtils.printSubHeader("MODULE 3 > CHECK-OUT GUEST", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> eligible = controller.getReservationsByStatus("CHECKED_IN");
+        if (eligible.isEmpty()) {
+            System.out.println("No checked-in bookings are currently available for check-out.");
+            return;
+        }
+        displayEligibleReservations("ROOMS AVAILABLE FOR CHECK-OUT", eligible);
         System.out.print("Enter Confirmation No: ");
         String confirmNo = utility.UIUtils.safeReadLine(scanner);
 
@@ -165,12 +183,24 @@ public class FrontDeskUI {
 
     private void cancelReservation() {
         utility.UIUtils.printSubHeader("MODULE 3 > CANCEL RESERVATION", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> eligible = controller.getCancellableReservations();
+        if (eligible.isEmpty()) {
+            System.out.println("No pending or confirmed bookings are currently available for cancellation.");
+            return;
+        }
+        displayReservationChoices("BOOKINGS AVAILABLE FOR CANCELLATION", eligible, true);
         System.out.print("Enter Confirmation No: ");
         String confirmNo = utility.UIUtils.safeReadLine(scanner);
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
             System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+
+        if (!"PENDING".equals(res.getBookingStatus())
+                && !"CONFIRMED".equals(res.getBookingStatus())) {
+            System.out.println("Cannot cancel. Current status: " + res.getBookingStatus());
             return;
         }
 
@@ -272,6 +302,46 @@ public class FrontDeskUI {
         System.out.println("  Check-Out Date  : " + res.getCheckOutDate());
         System.out.println("  Priority Score  : " + res.getPriorityScore());
         System.out.println("+------------------------------------------+");
+    }
+
+    private void displayEligibleReservations(String title,
+                                              DoublyLinkedList<Reservation> reservations) {
+        displayReservationChoices(title, reservations, false);
+    }
+
+    private void displayReservationChoices(String title,
+                                             DoublyLinkedList<Reservation> reservations,
+                                             boolean showStatus) {
+        System.out.println("\n" + title);
+        if (showStatus) {
+            System.out.println("+-----+----------------+----------+-----------+----------------+-------------+");
+            System.out.println("| No. | Confirmation ID| Room No. | Room Type | Guest ID       | Status      |");
+            System.out.println("+-----+----------------+----------+-----------+----------------+-------------+");
+        } else {
+            System.out.println("+-----+----------------+----------+-----------+----------------+");
+            System.out.println("| No. | Confirmation ID| Room No. | Room Type | Guest ID       |");
+            System.out.println("+-----+----------------+----------+-----------+----------------+");
+        }
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            String roomNo = reservation.getAssignedRoomNo() == null
+                    ? "---" : reservation.getAssignedRoomNo();
+            if (showStatus) {
+                System.out.printf("| %-3d | %-14s | %-8s | %-9s | %-14s | %-11s |%n",
+                        i, reservation.getConfirmationNo(), roomNo, reservation.getRoomType(),
+                        reservation.getGuestId(), reservation.getBookingStatus());
+            } else {
+                System.out.printf("| %-3d | %-14s | %-8s | %-9s | %-14s |%n",
+                        i, reservation.getConfirmationNo(), roomNo,
+                        reservation.getRoomType(), reservation.getGuestId());
+            }
+        }
+        if (showStatus) {
+            System.out.println("+-----+----------------+----------+-----------+----------------+-------------+");
+        } else {
+            System.out.println("+-----+----------------+----------+-----------+----------------+");
+        }
+        System.out.println();
     }
 
     private int readInt() {

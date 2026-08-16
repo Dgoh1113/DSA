@@ -123,6 +123,7 @@ public class Main {
             // Save seeded data to text files
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
+                searchTree,
                 loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
             );
         }
@@ -150,6 +151,7 @@ public class Main {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
+                searchTree,
                 loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
             );
         }));
@@ -168,6 +170,7 @@ public class Main {
         // Save data on exiting main menu
         utility.FilePersistenceUtils.saveAllData(
             masterRegistry, roomInventory, standardQueue, vipQueue,
+            searchTree,
             loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
         );
     }

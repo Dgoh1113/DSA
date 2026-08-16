@@ -95,7 +95,8 @@ public class StandardBookingController {
             return null;
         }
 
-        Reservation reservation = standardQueue.dequeue();
+        Reservation reservation = dequeueNextActiveReservation();
+        if (reservation == null) return null;
 
         // Find an available room matching the requested type
         Room assignedRoom = findAvailableRoom(reservation.getRoomType());
@@ -127,8 +128,17 @@ public class StandardBookingController {
         } else {
             // No room available — booking stays PENDING but is dequeued
             reservation.setBookingStatus("PENDING");
+            standardQueue.enqueue(reservation);
         }
 
+        return reservation;
+    }
+
+    private Reservation dequeueNextActiveReservation() {
+        Reservation reservation = standardQueue.dequeue();
+        while (reservation != null && "CANCELLED".equals(reservation.getBookingStatus())) {
+            reservation = standardQueue.dequeue();
+        }
         return reservation;
     }
 

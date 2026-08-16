@@ -102,6 +102,11 @@ public class VIPAllocationController {
         }
 
         VIPReservation vipRes = vipQueue.dequeue();
+        while (vipRes != null
+                && "CANCELLED".equals(vipRes.getReservation().getBookingStatus())) {
+            vipRes = vipQueue.dequeue();
+        }
+        if (vipRes == null) return null;
         Reservation reservation = vipRes.getReservation();
 
         // Find an available room
@@ -133,6 +138,7 @@ public class VIPAllocationController {
             }
         } else {
             reservation.setBookingStatus("PENDING");
+            vipQueue.enqueue(vipRes);
         }
 
         return reservation;
