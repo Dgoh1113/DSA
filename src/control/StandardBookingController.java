@@ -187,7 +187,7 @@ public class StandardBookingController {
 
     private Reservation dequeueNextActiveReservation() {
         Reservation reservation = standardQueue.dequeue();
-        while (reservation != null && "CANCELLED".equals(reservation.getBookingStatus())) {
+        while (reservation != null && !"PENDING".equals(reservation.getBookingStatus())) {
             reservation = standardQueue.dequeue();
         }
         return reservation;

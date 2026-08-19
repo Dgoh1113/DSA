@@ -116,7 +116,7 @@ public class VIPAllocationController {
 
         VIPReservation vipRes = vipQueue.dequeue();
         while (vipRes != null
-                && "CANCELLED".equals(vipRes.getReservation().getBookingStatus())) {
+                && !"PENDING".equals(vipRes.getReservation().getBookingStatus())) {
             vipRes = vipQueue.dequeue();
         }
         if (vipRes == null) return null;

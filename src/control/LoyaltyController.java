@@ -1,10 +1,13 @@
 package control;
 
 import adt.DoublyLinkedList;
+import adt.BinarySearchTree;
 import adt.SortAlgorithms;
 import entity.Guest;
 import entity.LoyaltyAccount;
 import entity.RedemptionTransaction;
+import entity.Reservation;
+import entity.Room;
 
 /**
  * Controller: Module 4 — Loyalty and Rewards Service.
@@ -34,6 +37,8 @@ public class LoyaltyController {
     private DoublyLinkedList<LoyaltyAccount> loyaltyAccounts;
     private DoublyLinkedList<RedemptionTransaction> redemptionLog;
     private UndoController undoController;
+    private DoublyLinkedList<Room> roomInventory;
+    private BinarySearchTree<Reservation> reservationRegistry;
 
     public LoyaltyController(DoublyLinkedList<Guest> guestRegistry,
                              DoublyLinkedList<LoyaltyAccount> loyaltyAccounts,
@@ -45,6 +50,13 @@ public class LoyaltyController {
 
     public void setUndoController(UndoController undoController) {
         this.undoController = undoController;
+    }
+
+    /** Supplies the shared reservation and room records needed for room upgrades. */
+    public void setReservationResources(DoublyLinkedList<Room> roomInventory,
+                                        BinarySearchTree<Reservation> reservationRegistry) {
+        this.roomInventory = roomInventory;
+        this.reservationRegistry = reservationRegistry;
     }
 
     /**
@@ -158,6 +170,118 @@ public class LoyaltyController {
         }
 
         return txn;
+    }
+
+    /**
+     * Returns a member's active bookings that can be considered for a room
+     * upgrade. Suite bookings are intentionally included so the UI can explain
+     * that they cannot be upgraded further.
+     */
+    public DoublyLinkedList<Reservation> getRoomUpgradeBookings(String memberId) {
+        DoublyLinkedList<Reservation> bookings = new DoublyLinkedList<>();
+        if (reservationRegistry == null || memberId == null) return bookings;
+
+        DoublyLinkedList<Reservation> reservations = reservationRegistry.inOrderTraversal();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null
+                    && memberId.equalsIgnoreCase(reservation.getGuestId())
+                    && ("PENDING".equals(reservation.getBookingStatus())
+                        || "CONFIRMED".equals(reservation.getBookingStatus()))) {
+                bookings.add(reservation);
+            }
+        }
+        return bookings;
+    }
+
+    /**
+     * Applies a one-level room upgrade to an active reservation:
+     * STANDARD -> DELUXE or DELUXE -> SUITE. Points are deducted only after a
+     * suitable higher-tier room has been found and the booking is updated.
+     */
+    public RoomUpgradeResult redeemRoomUpgrade(String memberId, String confirmationNo,
+                                                int pointsCost) {
+        LoyaltyAccount account = findAccount(memberId);
+        if (account == null) {
+            return RoomUpgradeResult.failure("No loyalty account was found for this member.");
+        }
+        if (roomInventory == null || reservationRegistry == null) {
+            return RoomUpgradeResult.failure("Room upgrade service is not configured.");
+        }
+        if (account.getTotalPoints() < pointsCost) {
+            return RoomUpgradeResult.failure("Insufficient points. You need " + pointsCost
+                    + " points but have " + account.getTotalPoints() + ".");
+        }
+
+        Reservation reservation = findActiveBooking(memberId, confirmationNo);
+        if (reservation == null) {
+            return RoomUpgradeResult.failure("No active booking was found for that confirmation number.");
+        }
+
+        String currentType = reservation.getRoomType();
+        if ("SUITE".equals(currentType)) {
+            return RoomUpgradeResult.failure("This booking is already a SUITE and cannot be upgraded further.");
+        }
+
+        String upgradedType;
+        if ("STANDARD".equals(currentType)) {
+            upgradedType = "DELUXE";
+        } else if ("DELUXE".equals(currentType)) {
+            upgradedType = "SUITE";
+        } else {
+            return RoomUpgradeResult.failure("This booking has an unsupported room type: " + currentType + ".");
+        }
+
+        Room currentRoom = findRoom(reservation.getAssignedRoomNo());
+        if ("CONFIRMED".equals(reservation.getBookingStatus()) && currentRoom == null) {
+            return RoomUpgradeResult.failure("The booked room could not be found. The upgrade was not applied.");
+        }
+        Room upgradedRoom = findAvailableRoom(upgradedType);
+        if (upgradedRoom == null) {
+            return RoomUpgradeResult.failure("No " + upgradedType
+                    + " room is currently available. The booking was not changed.");
+        }
+
+        String oldRoomNo = reservation.getAssignedRoomNo();
+        String oldBookingStatus = reservation.getBookingStatus();
+        reservationRegistry.delete(reservation);
+        if (currentRoom != null) currentRoom.setStatus("AVAILABLE");
+        upgradedRoom.setStatus("OCCUPIED");
+        reservation.setRoomType(upgradedType);
+        reservation.setAssignedRoomNo(upgradedRoom.getRoomNo());
+        reservation.setBookingStatus("CONFIRMED");
+        reservationRegistry.insert(reservation);
+
+        account.setTotalPoints(account.getTotalPoints() - pointsCost);
+        String reward = "Room Upgrade (" + currentType + " -> " + upgradedType + ")";
+        account.addHistoryEntry("-" + pointsCost + " pts (Redeemed: " + reward + ")");
+        RedemptionTransaction transaction = new RedemptionTransaction(
+                memberId, reward, pointsCost, getCurrentDate());
+        redemptionLog.add(transaction);
+        checkAndUpgradeTier(memberId);
+
+        if (undoController != null) {
+            undoController.recordAction(
+                "ROOM_UPGRADE_REDEMPTION",
+                "Module 4: Loyalty & Rewards",
+                "Upgraded Conf #" + confirmationNo + " from " + currentType + " to " + upgradedType,
+                () -> {
+                    reservationRegistry.delete(reservation);
+                    upgradedRoom.setStatus("AVAILABLE");
+                    if (currentRoom != null) currentRoom.setStatus("OCCUPIED");
+                    reservation.setRoomType(currentType);
+                    reservation.setAssignedRoomNo(oldRoomNo);
+                    reservation.setBookingStatus(oldBookingStatus);
+                    reservationRegistry.insert(reservation);
+                    account.setTotalPoints(account.getTotalPoints() + pointsCost);
+                    account.addHistoryEntry("+" + pointsCost + " pts (REFUND: Undone " + reward + ")");
+                    removeTransaction(transaction);
+                    checkAndUpgradeTier(memberId);
+                }
+            );
+        }
+
+        return RoomUpgradeResult.success(transaction, reservation, currentType, upgradedType);
     }
 
     /**
@@ -325,6 +449,84 @@ public class LoyaltyController {
             }
         }
         return null;
+    }
+
+    private Reservation findActiveBooking(String memberId, String confirmationNo) {
+        if (confirmationNo == null) return null;
+        DoublyLinkedList<Reservation> bookings = getRoomUpgradeBookings(memberId);
+        for (int i = 1; i <= bookings.getNumberOfEntries(); i++) {
+            Reservation booking = bookings.getEntry(i);
+            if (confirmationNo.trim().equals(booking.getConfirmationNo())) {
+                return booking;
+            }
+        }
+        return null;
+    }
+
+    private Room findRoom(String roomNo) {
+        if (roomNo == null) return null;
+        for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
+            Room room = roomInventory.getEntry(i);
+            if (room != null && roomNo.equals(room.getRoomNo())) return room;
+        }
+        return null;
+    }
+
+    private Room findAvailableRoom(String roomType) {
+        for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
+            Room room = roomInventory.getEntry(i);
+            if (room != null && roomType.equals(room.getRoomType())
+                    && "AVAILABLE".equals(room.getStatus())) {
+                return room;
+            }
+        }
+        return null;
+    }
+
+    private void removeTransaction(RedemptionTransaction transaction) {
+        for (int i = 1; i <= redemptionLog.getNumberOfEntries(); i++) {
+            if (redemptionLog.getEntry(i).equals(transaction)) {
+                redemptionLog.remove(i);
+                return;
+            }
+        }
+    }
+
+    /** Result returned by a room-upgrade redemption, including an actionable error message. */
+    public static class RoomUpgradeResult {
+        private final RedemptionTransaction transaction;
+        private final Reservation reservation;
+        private final String previousRoomType;
+        private final String upgradedRoomType;
+        private final String errorMessage;
+
+        private RoomUpgradeResult(RedemptionTransaction transaction, Reservation reservation,
+                                  String previousRoomType, String upgradedRoomType,
+                                  String errorMessage) {
+            this.transaction = transaction;
+            this.reservation = reservation;
+            this.previousRoomType = previousRoomType;
+            this.upgradedRoomType = upgradedRoomType;
+            this.errorMessage = errorMessage;
+        }
+
+        public static RoomUpgradeResult success(RedemptionTransaction transaction,
+                                                Reservation reservation, String previousRoomType,
+                                                String upgradedRoomType) {
+            return new RoomUpgradeResult(transaction, reservation, previousRoomType,
+                    upgradedRoomType, null);
+        }
+
+        public static RoomUpgradeResult failure(String errorMessage) {
+            return new RoomUpgradeResult(null, null, null, null, errorMessage);
+        }
+
+        public boolean isSuccessful() { return transaction != null; }
+        public RedemptionTransaction getTransaction() { return transaction; }
+        public Reservation getReservation() { return reservation; }
+        public String getPreviousRoomType() { return previousRoomType; }
+        public String getUpgradedRoomType() { return upgradedRoomType; }
+        public String getErrorMessage() { return errorMessage; }
     }
 
     private Guest findGuestByContactNo(String contactNo) {

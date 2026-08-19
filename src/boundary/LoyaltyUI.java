@@ -5,6 +5,7 @@ import control.LoyaltyController;
 import entity.Guest;
 import entity.LoyaltyAccount;
 import entity.RedemptionTransaction;
+import entity.Reservation;
 import java.util.Scanner;
 
 /**
@@ -170,7 +171,7 @@ public class LoyaltyUI {
                 }
                 case 1: {
                     System.out.println("\nAvailable Rewards:");
-                    System.out.println("  1. Room Upgrade     - 500 pts");
+                    System.out.println("  1. Room Upgrade     - 500 pts (active booking required)");
                     System.out.println("  2. Free Breakfast   - 300 pts");
                     System.out.println("  3. Spa Voucher      - 800 pts");
                     System.out.println("  4. Late Checkout    - 200 pts");
@@ -184,6 +185,10 @@ public class LoyaltyUI {
                     else if (input.equals("2")) { rewardItem = "Free Breakfast"; pointsCost = 300; }
                     else if (input.equals("3")) { rewardItem = "Spa Voucher"; pointsCost = 800; }
                     else if (input.equals("4")) { rewardItem = "Late Checkout"; pointsCost = 200; }
+                    else if (input.equalsIgnoreCase("room upgrade")) {
+                        rewardItem = "Room Upgrade";
+                        pointsCost = 500;
+                    }
                     else {
                         rewardItem = input;
                         pointsCost = 200;
@@ -204,6 +209,11 @@ public class LoyaltyUI {
             return false;
         }
 
+        if ("Room Upgrade".equalsIgnoreCase(rewardItem)) {
+            redeemRoomUpgrade(memberId, account, pointsCost);
+            return false;
+        }
+
         RedemptionTransaction txn = controller.redeemPoints(memberId, rewardItem, pointsCost);
         if (txn != null) {
             System.out.println("\n*** REDEMPTION SUCCESSFUL ***");
@@ -216,6 +226,53 @@ public class LoyaltyUI {
             System.out.println("\n[!] Redemption failed.");
         }
         return false;
+    }
+
+    private void redeemRoomUpgrade(String memberId, LoyaltyAccount account, int pointsCost) {
+        DoublyLinkedList<Reservation> bookings = controller.getRoomUpgradeBookings(memberId);
+        if (bookings.isEmpty()) {
+            System.out.println("\n[!] Room upgrade unavailable: this member has no active booking.");
+            return;
+        }
+
+        System.out.println("\nActive bookings eligible for review:");
+        System.out.println("+-----+----------------+-----------+--------+------------+------------+");
+        System.out.println("| No. | Confirmation   | Room Type | Room   | Check-In   | Check-Out  |");
+        System.out.println("+-----+----------------+-----------+--------+------------+------------+");
+        for (int i = 1; i <= bookings.getNumberOfEntries(); i++) {
+            Reservation booking = bookings.getEntry(i);
+            System.out.printf("| %-3d | %-14s | %-9s | %-6s | %-10s | %-10s |%n",
+                    i, booking.getConfirmationNo(), booking.getRoomType(),
+                    booking.getAssignedRoomNo() == null ? "---" : booking.getAssignedRoomNo(),
+                    booking.getCheckInDate(), booking.getCheckOutDate());
+        }
+        System.out.println("+-----+----------------+-----------+--------+------------+------------+");
+        System.out.println("  STANDARD upgrades to DELUXE; DELUXE upgrades to SUITE.");
+        System.out.println("  SUITE bookings cannot be upgraded further.");
+        System.out.print("Enter the confirmation number to upgrade (or 'cancel'): ");
+        String confirmationNo = utility.UIUtils.safeReadLine(scanner);
+        if ("cancel".equalsIgnoreCase(confirmationNo)) {
+            System.out.println("Room upgrade cancelled. No points were deducted.");
+            return;
+        }
+
+        LoyaltyController.RoomUpgradeResult result = controller.redeemRoomUpgrade(
+                memberId, confirmationNo, pointsCost);
+        if (!result.isSuccessful()) {
+            System.out.println("\n[!] Room upgrade failed: " + result.getErrorMessage());
+            return;
+        }
+
+        RedemptionTransaction transaction = result.getTransaction();
+        Reservation upgradedBooking = result.getReservation();
+        System.out.println("\n*** ROOM UPGRADE SUCCESSFUL ***");
+        System.out.println("  Transaction ID  : " + transaction.getTransactionId());
+        System.out.println("  Booking          : " + upgradedBooking.getConfirmationNo());
+        System.out.println("  Room Upgrade     : " + result.getPreviousRoomType()
+                + " -> " + result.getUpgradedRoomType());
+        System.out.println("  New Room         : " + upgradedBooking.getAssignedRoomNo());
+        System.out.println("  Points Deducted  : " + transaction.getPointsDeducted());
+        System.out.println("  Remaining Points : " + account.getTotalPoints());
     }
 
     private void viewTransactionHistory() {

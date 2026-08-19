@@ -1,4 +1,4 @@
-G1000|12000|DIAMOND||Initial Seed Points
+G1000|16500|DIAMOND|2027-08-19|Initial Seed Points;;;-500 pts (Redeemed: Room Upgrade);;;-500 pts (Redeemed: Room Upgrade (DELUXE -> SUITE));;;+5500 pts (Stay: 11 nights @ $500.0/night)
 G1001|3000|GOLD||Initial Seed Points;;;-500 pts (Redeemed: Room Upgrade)
 G1002|0|STANDARD||
 G1003|0|STANDARD||
