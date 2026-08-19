@@ -161,29 +161,49 @@ public class VIPAllocationController {
      * Peeks at the highest-priority VIP reservation without removing it.
      */
     public Reservation peekNextVIP() {
-        VIPReservation vipRes = vipQueue.peek();
-        return (vipRes != null) ? vipRes.getReservation() : null;
+        VIPReservation nextVIP = null;
+        DoublyLinkedList<VIPReservation> reservations = vipQueue.toList();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            VIPReservation candidate = reservations.getEntry(i);
+            if (candidate == null || candidate.getReservation() == null
+                    || !"PENDING".equals(candidate.getReservation().getBookingStatus())) {
+                continue;
+            }
+            if (nextVIP == null || candidate.compareTo(nextVIP) > 0) {
+                nextVIP = candidate;
+            }
+        }
+        return nextVIP == null ? null : nextVIP.getReservation();
     }
 
     /**
      * Returns the size of the VIP queue.
      */
     public int getVIPQueueSize() {
-        return vipQueue.size();
+        return getVIPQueueList().getNumberOfEntries();
     }
 
     /**
      * Returns all VIP reservations currently in the heap.
      */
     public DoublyLinkedList<VIPReservation> getVIPQueueList() {
-        return vipQueue.toList();
+        DoublyLinkedList<VIPReservation> pendingReservations = new DoublyLinkedList<>();
+        DoublyLinkedList<VIPReservation> allReservations = vipQueue.toList();
+        for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
+            VIPReservation reservation = allReservations.getEntry(i);
+            if (reservation != null && reservation.getReservation() != null
+                    && "PENDING".equals(reservation.getReservation().getBookingStatus())) {
+                pendingReservations.add(reservation);
+            }
+        }
+        return pendingReservations;
     }
 
     /**
      * Checks if the VIP queue is empty.
      */
     public boolean isVIPQueueEmpty() {
-        return vipQueue.isEmpty();
+        return peekNextVIP() == null;
     }
 
     /**

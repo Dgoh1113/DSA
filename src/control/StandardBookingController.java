@@ -197,28 +197,43 @@ public class StandardBookingController {
      * Peeks at the next booking in the queue without removing it.
      */
     public Reservation peekNextBooking() {
-        return standardQueue.getFront();
+        DoublyLinkedList<Reservation> reservations = standardQueue.toList();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null && "PENDING".equals(reservation.getBookingStatus())) {
+                return reservation;
+            }
+        }
+        return null;
     }
 
     /**
      * Returns the current size of the standard queue.
      */
     public int getQueueSize() {
-        return standardQueue.size();
+        return getQueueList().getNumberOfEntries();
     }
 
     /**
      * Returns all reservations currently in the standard queue.
      */
     public DoublyLinkedList<Reservation> getQueueList() {
-        return standardQueue.toList();
+        DoublyLinkedList<Reservation> pendingReservations = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> allReservations = standardQueue.toList();
+        for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
+            Reservation reservation = allReservations.getEntry(i);
+            if (reservation != null && "PENDING".equals(reservation.getBookingStatus())) {
+                pendingReservations.add(reservation);
+            }
+        }
+        return pendingReservations;
     }
 
     /**
      * Checks if the standard queue is empty.
      */
     public boolean isQueueEmpty() {
-        return standardQueue.isEmpty();
+        return peekNextBooking() == null;
     }
 
     /**

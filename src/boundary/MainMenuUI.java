@@ -1,12 +1,15 @@
 package boundary;
 
+import adt.DoublyLinkedList;
 import control.FrontDeskController;
 import control.LoyaltyController;
 import control.PartnerController;
 import control.StandardBookingController;
 import control.VIPAllocationController;
+import control.VIPAllocationController.VIPReservation;
 import entity.Guest;
 import entity.LoyaltyAccount;
+import entity.Reservation;
 import java.util.Scanner;
 
 /**
@@ -23,6 +26,7 @@ public class MainMenuUI {
     private PartnerUI partnerUI;
     private Scanner scanner;
     private StandardBookingController bookingController;
+    private VIPAllocationController vipController;
     private LoyaltyController loyaltyController;
     private Guest currentMember;
 
@@ -33,6 +37,7 @@ public class MainMenuUI {
                       PartnerController mod5) {
         this.scanner = new Scanner(System.in);
         this.bookingController = mod1;
+        this.vipController = mod2;
         this.loyaltyController = mod4;
         this.standardBookingUI = new StandardBookingUI(mod1, scanner);
         this.vipAllocationUI = new VIPAllocationUI(mod2, scanner);
@@ -131,6 +136,7 @@ public class MainMenuUI {
             utility.UIUtils.printSectionHeader("IS MEMBER?", utility.UIUtils.CYAN);
             System.out.println("  1. Enter Phone Number");
             System.out.println("  2. Register New Member");
+            System.out.println("  3. Check / Approve Customer Queue");
             System.out.println("  0. Exit Application");
             System.out.print("Enter your choice: ");
             int choice = utility.UIUtils.safeReadInt(scanner);
@@ -165,11 +171,162 @@ public class MainMenuUI {
                 System.out.println("\nMember registered successfully. Member ID: "
                         + member.getGuestId() + " | Tier: " + member.getLoyaltyTier());
                 return member;
+            } else if (choice == 3) {
+                showQueueManagement();
             } else {
-                System.out.println("Invalid option. Please choose 1, 2, or 0.");
+                System.out.println("Invalid option. Please choose 0, 1, 2, or 3.");
                 utility.UIUtils.pressEnterToContinue(scanner);
             }
         }
+    }
+
+    /**
+     * Lets front-desk staff review and approve waiting bookings before a
+     * customer signs in. Standard bookings remain FIFO; VIP bookings retain
+     * their max-heap priority order.
+     */
+    private void showQueueManagement() {
+        boolean backToLogin = false;
+        while (!backToLogin) {
+            utility.UIUtils.clearScreen();
+            utility.UIUtils.printMainTitleHeader();
+            utility.UIUtils.printSectionHeader("QUEUE CHECK & APPROVAL", utility.UIUtils.CYAN);
+            System.out.println("  Standard customers waiting : " + bookingController.getQueueSize());
+            System.out.println("  VIP customers waiting      : " + vipController.getVIPQueueSize());
+            System.out.println("\n  1. View All Waiting Customers");
+            System.out.println("  2. Approve Next Standard Booking (FIFO)");
+            System.out.println("  3. Approve Next VIP Booking (Priority)");
+            System.out.println("  0. Back to Login");
+            System.out.print("Enter your choice: ");
+
+            switch (utility.UIUtils.safeReadInt(scanner)) {
+                case 1:
+                    displayWaitingCustomers();
+                    utility.UIUtils.pressEnterToContinue(scanner);
+                    break;
+                case 2:
+                    approveNextStandardBooking();
+                    utility.UIUtils.pressEnterToContinue(scanner);
+                    break;
+                case 3:
+                    approveNextVIPBooking();
+                    utility.UIUtils.pressEnterToContinue(scanner);
+                    break;
+                case 0:
+                    backToLogin = true;
+                    break;
+                default:
+                    System.out.println("Invalid option. Please try again.");
+                    utility.UIUtils.pressEnterToContinue(scanner);
+            }
+        }
+    }
+
+    private void displayWaitingCustomers() {
+        utility.UIUtils.clearScreen();
+        utility.UIUtils.printSectionHeader("CUSTOMERS STILL IN QUEUE", utility.UIUtils.CYAN);
+
+        DoublyLinkedList<Reservation> standardQueue = bookingController.getQueueList();
+        System.out.println("\nSTANDARD QUEUE (FIFO)");
+        if (standardQueue.isEmpty()) {
+            System.out.println("  No standard customers are waiting.");
+        } else {
+            System.out.println("+-----+----------------+----------------------+-----------+------------+");
+            System.out.println("| No. | Confirmation   | Customer             | Room Type | Status     |");
+            System.out.println("+-----+----------------+----------------------+-----------+------------+");
+            for (int i = 1; i <= standardQueue.getNumberOfEntries(); i++) {
+                Reservation reservation = standardQueue.getEntry(i);
+                printQueueRow(i, reservation);
+            }
+            System.out.println("+-----+----------------+----------------------+-----------+------------+");
+        }
+
+        DoublyLinkedList<VIPReservation> vipQueue = vipController.getVIPQueueList();
+        System.out.println("\nVIP QUEUE (HIGHEST PRIORITY IS APPROVED FIRST)");
+        if (vipQueue.isEmpty()) {
+            System.out.println("  No VIP customers are waiting.");
+        } else {
+            System.out.println("+-----+----------------+----------------------+-----------+----------+------------+");
+            System.out.println("| No. | Confirmation   | Customer             | Room Type | Priority | Status     |");
+            System.out.println("+-----+----------------+----------------------+-----------+----------+------------+");
+            for (int i = 1; i <= vipQueue.getNumberOfEntries(); i++) {
+                Reservation reservation = vipQueue.getEntry(i).getReservation();
+                String name = reservation.getGuest() == null
+                        ? reservation.getGuestId() : reservation.getGuest().getName();
+                System.out.printf("| %-3d | %-14s | %-20s | %-9s | %-8d | %-10s |%n",
+                        i, reservation.getConfirmationNo(), name, reservation.getRoomType(),
+                        reservation.getPriorityScore(), reservation.getBookingStatus());
+            }
+            System.out.println("+-----+----------------+----------------------+-----------+----------+------------+");
+        }
+    }
+
+    private void approveNextStandardBooking() {
+        Reservation nextBooking = bookingController.peekNextBooking();
+        if (nextBooking == null) {
+            System.out.println("No standard customers are waiting for approval.");
+            return;
+        }
+
+        System.out.println("\nNext standard customer (FIFO):");
+        printReservationSummary(nextBooking);
+        if (!confirmApproval()) return;
+
+        Reservation approvedBooking = bookingController.processNextBooking();
+        displayApprovalResult(approvedBooking, "standard");
+    }
+
+    private void approveNextVIPBooking() {
+        Reservation nextBooking = vipController.peekNextVIP();
+        if (nextBooking == null) {
+            System.out.println("No VIP customers are waiting for approval.");
+            return;
+        }
+
+        System.out.println("\nHighest-priority VIP customer:");
+        printReservationSummary(nextBooking);
+        if (!confirmApproval()) return;
+
+        Reservation approvedBooking = vipController.allocateNextVIP();
+        displayApprovalResult(approvedBooking, "VIP");
+    }
+
+    private boolean confirmApproval() {
+        System.out.print("Approve this booking and assign a room? (Y/N): ");
+        if (!"Y".equalsIgnoreCase(utility.UIUtils.safeReadLine(scanner))) {
+            System.out.println("Approval cancelled. The customer remains in the queue.");
+            return false;
+        }
+        return true;
+    }
+
+    private void displayApprovalResult(Reservation reservation, String queueType) {
+        if (reservation == null) {
+            System.out.println("The queue could not be processed.");
+        } else if ("CONFIRMED".equals(reservation.getBookingStatus())) {
+            System.out.println("\nBooking approved. Room " + reservation.getAssignedRoomNo()
+                    + " assigned to " + customerName(reservation) + ".");
+        } else {
+            System.out.println("\nNo room is currently available. " + customerName(reservation)
+                    + " remains in the " + queueType + " queue.");
+        }
+    }
+
+    private void printReservationSummary(Reservation reservation) {
+        System.out.println("  Customer        : " + customerName(reservation));
+        System.out.println("  Confirmation No : " + reservation.getConfirmationNo());
+        System.out.println("  Room Type       : " + reservation.getRoomType());
+        System.out.println("  Check-In Date   : " + reservation.getCheckInDate());
+    }
+
+    private void printQueueRow(int position, Reservation reservation) {
+        System.out.printf("| %-3d | %-14s | %-20s | %-9s | %-10s |%n",
+                position, reservation.getConfirmationNo(), customerName(reservation),
+                reservation.getRoomType(), reservation.getBookingStatus());
+    }
+
+    private String customerName(Reservation reservation) {
+        return reservation.getGuest() == null ? reservation.getGuestId() : reservation.getGuest().getName();
     }
 
     private boolean isVIPEligible() {
