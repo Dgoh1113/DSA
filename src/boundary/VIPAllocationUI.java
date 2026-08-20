@@ -55,6 +55,14 @@ public class VIPAllocationUI {
                     viewVIPQueue();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
+                case 5:
+                    priorityQueueSummary();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 6:
+                    allocationPerformanceReport();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
                 case 0:
                     exitToMainMenu = true;
                     break;
@@ -73,6 +81,10 @@ public class VIPAllocationUI {
         utility.UIUtils.printSectionHeader("PRIORITY QUEUE MONITORING", utility.UIUtils.YELLOW);
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Peek Highest Priority VIP");
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " View VIP Priority Queue");
+
+        utility.UIUtils.printSectionHeader("REPORTS & ANALYTICS", utility.UIUtils.YELLOW);
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Generate Priority Queue Summary (Screen)");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Generate Allocation Performance Report");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -338,6 +350,40 @@ DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
                     tier, res.getPriorityScore(), res.getBookingStatus());
         }
         System.out.println("+-----+----------------+----------------+----------+----------+--------+");
+    }
+
+    private void priorityQueueSummary() {
+        utility.UIUtils.printSubHeader("MODULE 2 > PRIORITY QUEUE SUMMARY", utility.UIUtils.YELLOW);
+        VIPAllocationController.PriorityQueueSummary summary = controller.generatePriorityQueueSummary();
+
+        System.out.println("+------------------------------------------+");
+        System.out.println("         PRIORITY QUEUE SUMMARY");
+        System.out.println("+------------------------------------------+");
+        System.out.println("  Pending VIPs       : " + summary.getPendingCount());
+        System.out.println("  Highest Priority   : " + summary.getHighestPriorityScore());
+        System.out.println("  SILVER             : " + summary.getSilverCount());
+        System.out.println("  GOLD               : " + summary.getGoldCount());
+        System.out.println("  PLATINUM           : " + summary.getPlatinumCount());
+        System.out.println("  DIAMOND            : " + summary.getDiamondCount());
+        System.out.println("  STANDARD Requests  : " + summary.getStandardRoomCount());
+        System.out.println("  DELUXE Requests    : " + summary.getDeluxeRoomCount());
+        System.out.println("  SUITE Requests     : " + summary.getSuiteRoomCount());
+        System.out.println("+------------------------------------------+");
+    }
+
+    private void allocationPerformanceReport() {
+        utility.UIUtils.printSubHeader("MODULE 2 > ALLOCATION PERFORMANCE REPORT", utility.UIUtils.YELLOW);
+        VIPAllocationController.AllocationPerformanceReport report = controller.generateAllocationPerformanceReport();
+
+        System.out.println("+------------------------------------------+");
+        System.out.println("       ALLOCATION PERFORMANCE REPORT");
+        System.out.println("+------------------------------------------+");
+        System.out.println("  Total VIP Bookings : " + report.getTotalBookings());
+        System.out.println("  Allocated Rooms    : " + report.getAllocatedBookings());
+        System.out.println("  Pending Bookings   : " + report.getPendingBookings());
+        System.out.println("  Cancelled Bookings : " + report.getCancelledBookings());
+        System.out.printf("  Allocation Rate     : %.2f%%%n", report.getAllocationRate());
+        System.out.println("+------------------------------------------+");
     }
 
     private int readInt() {
