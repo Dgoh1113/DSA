@@ -43,28 +43,30 @@ public class VIPAllocationController {
         this.undoController = undoController;
     }
 
-    /**
-     * Adds a VIP guest booking into the priority queue.
-     * Calculates the priority score and wraps the reservation in a VIPReservation
-     * for Max-Heap ordering.
-     *
-     * @return The created Reservation.
-     */
-    public Reservation addVIPBooking(String name, String icPassport, String contactNo,
-                                      String email, String loyaltyTier, String roomType,
-                                      String checkInDate, String checkOutDate) {
-        // Create VIP guest
-        Guest guest = new Guest(name, icPassport, contactNo, email, loyaltyTier);
-        guestRegistry.add(guest);
-
-        return createVIPReservation(guest, roomType, checkInDate, checkOutDate);
+    /** Finds a registered guest by ID, ignoring letter case and surrounding whitespace. */
+    public Guest findGuestById(String guestId) {
+        if (guestId == null || guestId.trim().isEmpty()) return null;
+        String normalizedId = guestId.trim();
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest != null && guest.getGuestId().equalsIgnoreCase(normalizedId)) {
+                return guest;
+            }
+        }
+        return null;
     }
 
-    /** Creates a VIP booking using an authenticated loyalty member profile. */
+    /**
+     * Creates a VIP booking only for an existing, VIP-eligible guest.
+     * The registry copy is used so a caller cannot supply an unregistered profile
+     * or a manually altered loyalty tier.
+     */
     public Reservation addVIPBookingForGuest(Guest guest, String roomType,
                                               String checkInDate, String checkOutDate) {
-        if (guest == null || !guest.isVIP()) return null;
-        return createVIPReservation(guest, roomType, checkInDate, checkOutDate);
+        if (guest == null) return null;
+        Guest registeredGuest = findGuestById(guest.getGuestId());
+        if (registeredGuest == null || !registeredGuest.isVIP()) return null;
+        return createVIPReservation(registeredGuest, roomType, checkInDate, checkOutDate);
     }
 
     private Reservation createVIPReservation(Guest guest, String roomType,
@@ -206,6 +208,28 @@ public class VIPAllocationController {
         return peekNextVIP() == null;
     }
 
+    public PriorityQueueSummary generatePriorityQueueSummary() {
+        PriorityQueueSummary summary = new PriorityQueueSummary();
+        DoublyLinkedList<VIPReservation> reservations = getVIPQueueList();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i).getReservation();
+            summary.add(reservation);
+        }
+        return summary;
+    }
+
+    public AllocationPerformanceReport generateAllocationPerformanceReport() {
+        AllocationPerformanceReport report = new AllocationPerformanceReport();
+        DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null && reservation.getPriorityScore() > 0) {
+                report.add(reservation);
+            }
+        }
+        return report;
+    }
+
     /**
      * Calculates the priority score using the formula:
      * Priority Score = (Tier Weight × 10000) + Urgency Factor − Arrival Order Index
@@ -216,6 +240,71 @@ public class VIPAllocationController {
     public int calculatePriorityScore(int tierWeight, int arrivalIndex) {
         int urgencyFactor = 5000; // Baseline urgency
         return (tierWeight * 10000) + urgencyFactor - arrivalIndex;
+    }
+
+    public static class PriorityQueueSummary {
+        private int pendingCount;
+        private int highestPriorityScore;
+        private int silverCount;
+        private int goldCount;
+        private int platinumCount;
+        private int diamondCount;
+        private int standardRoomCount;
+        private int deluxeRoomCount;
+        private int suiteRoomCount;
+
+        private void add(Reservation reservation) {
+            pendingCount++;
+            highestPriorityScore = Math.max(highestPriorityScore, reservation.getPriorityScore());
+            String tier = reservation.getGuest() == null ? "" : reservation.getGuest().getLoyaltyTier();
+            if ("SILVER".equals(tier)) silverCount++;
+            else if ("GOLD".equals(tier)) goldCount++;
+            else if ("PLATINUM".equals(tier)) platinumCount++;
+            else if ("DIAMOND".equals(tier)) diamondCount++;
+
+            if ("STANDARD".equals(reservation.getRoomType())) standardRoomCount++;
+            else if ("DELUXE".equals(reservation.getRoomType())) deluxeRoomCount++;
+            else if ("SUITE".equals(reservation.getRoomType())) suiteRoomCount++;
+        }
+
+        public int getPendingCount() { return pendingCount; }
+        public int getHighestPriorityScore() { return pendingCount == 0 ? 0 : highestPriorityScore; }
+        public int getSilverCount() { return silverCount; }
+        public int getGoldCount() { return goldCount; }
+        public int getPlatinumCount() { return platinumCount; }
+        public int getDiamondCount() { return diamondCount; }
+        public int getStandardRoomCount() { return standardRoomCount; }
+        public int getDeluxeRoomCount() { return deluxeRoomCount; }
+        public int getSuiteRoomCount() { return suiteRoomCount; }
+    }
+
+    public static class AllocationPerformanceReport {
+        private int totalBookings;
+        private int allocatedBookings;
+        private int pendingBookings;
+        private int cancelledBookings;
+
+        private void add(Reservation reservation) {
+            totalBookings++;
+            if (reservation.getAssignedRoomNo() != null
+                    || "CONFIRMED".equals(reservation.getBookingStatus())
+                    || "CHECKED_IN".equals(reservation.getBookingStatus())
+                    || "CHECKED_OUT".equals(reservation.getBookingStatus())) {
+                allocatedBookings++;
+            } else if ("CANCELLED".equals(reservation.getBookingStatus())) {
+                cancelledBookings++;
+            } else if ("PENDING".equals(reservation.getBookingStatus())) {
+                pendingBookings++;
+            }
+        }
+
+        public int getTotalBookings() { return totalBookings; }
+        public int getAllocatedBookings() { return allocatedBookings; }
+        public int getPendingBookings() { return pendingBookings; }
+        public int getCancelledBookings() { return cancelledBookings; }
+        public double getAllocationRate() {
+            return totalBookings == 0 ? 0.0 : allocatedBookings * 100.0 / totalBookings;
+        }
     }
 
     /**
