@@ -4,6 +4,7 @@ import adt.BinaryMaxHeap;
 import adt.BinarySearchTree;
 import adt.DoublyLinkedList;
 import entity.Guest;
+import entity.LoyaltyAccount;
 import entity.Reservation;
 import entity.Room;
 
@@ -25,16 +26,19 @@ public class VIPAllocationController {
 
     private BinaryMaxHeap<VIPReservation> vipQueue;
     private DoublyLinkedList<Guest> guestRegistry;
+    private DoublyLinkedList<LoyaltyAccount> loyaltyAccounts;
     private DoublyLinkedList<Room> roomInventory;
     private BinarySearchTree<Reservation> searchTree;
     private UndoController undoController;
 
     public VIPAllocationController(BinaryMaxHeap<VIPReservation> vipQueue,
                                    DoublyLinkedList<Guest> guestRegistry,
+                                   DoublyLinkedList<LoyaltyAccount> loyaltyAccounts,
                                    DoublyLinkedList<Room> roomInventory,
                                    BinarySearchTree<Reservation> searchTree) {
         this.vipQueue = vipQueue;
         this.guestRegistry = guestRegistry;
+        this.loyaltyAccounts = loyaltyAccounts;
         this.roomInventory = roomInventory;
         this.searchTree = searchTree;
     }
@@ -51,6 +55,20 @@ public class VIPAllocationController {
             Guest guest = guestRegistry.getEntry(i);
             if (guest != null && guest.getGuestId().equalsIgnoreCase(normalizedId)) {
                 return guest;
+            }
+        }
+        return null;
+    }
+
+    /** Returns the current loyalty points for a guest, or null if no loyalty account exists. */
+    public Integer getCurrentPointsByGuestId(String guestId) {
+        if (guestId == null || guestId.trim().isEmpty() || loyaltyAccounts == null) return null;
+        String normalizedId = guestId.trim();
+        for (int i = 1; i <= loyaltyAccounts.getNumberOfEntries(); i++) {
+            LoyaltyAccount account = loyaltyAccounts.getEntry(i);
+            if (account != null && account.getMemberId() != null
+                    && account.getMemberId().equalsIgnoreCase(normalizedId)) {
+                return account.getTotalPoints();
             }
         }
         return null;

@@ -78,7 +78,7 @@ public class VIPAllocationUI {
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " View VIP Priority Queue");
 
         utility.UIUtils.printSectionHeader("REPORTS & ANALYTICS", utility.UIUtils.YELLOW);
-        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Generate Priority Queue Summary (Screen)");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Generate Priority Queue Summary Report");
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Generate Allocation Performance Report");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
@@ -235,18 +235,24 @@ public class VIPAllocationUI {
         }
 
 DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
-        System.out.println("+-----+----------------+----------------+----------+----------+--------+");
-        System.out.println("| No. | Confirmation   | Guest ID       | Tier     | Priority | Status |");
-        System.out.println("+-----+----------------+----------------+----------+----------+--------+");
+    System.out.println("+-----+----------------+----------------------+----------------+-----------+----------+----------+------------+------------+--------+");
+    System.out.println("| No. | Confirmation   | Guest Name           | Guest ID       | Points    | Tier     | Priority | Check-In   | Check-Out  | Status |");
+    System.out.println("+-----+----------------+----------------------+----------------+-----------+----------+----------+------------+------------+--------+");
 
         for (int i = 1; i <= list.getNumberOfEntries(); i++) {
             Reservation res = list.getEntry(i).getReservation();
             String tier = (res.getGuest() != null) ? res.getGuest().getLoyaltyTier() : "N/A";
-            System.out.printf("| %-3d | %-14s | %-14s | %-8s | %-8d | %-6s |%n",
-                    i, res.getConfirmationNo(), res.getGuestId(),
-                    tier, res.getPriorityScore(), res.getBookingStatus());
+        String guestName = res.getGuest() != null ? res.getGuest().getName() : "N/A";
+        Integer currentPoints = controller.getCurrentPointsByGuestId(res.getGuestId());
+        System.out.printf("| %-3d | %-14s | %-20s | %-14s | %-9s | %-8s | %-8d | %-10s | %-10s | %-6s |%n",
+            i, res.getConfirmationNo(), guestName, res.getGuestId(),
+            currentPoints != null ? currentPoints.toString() : "N/A",
+            tier, res.getPriorityScore(),
+            res.getCheckInDate() != null ? res.getCheckInDate() : "N/A",
+            res.getCheckOutDate() != null ? res.getCheckOutDate() : "N/A",
+            res.getBookingStatus());
         }
-        System.out.println("+-----+----------------+----------------+----------+----------+--------+");
+    System.out.println("+-----+----------------+----------------------+----------------+-----------+----------+----------+------------+------------+--------+");
     }
 
     private void priorityQueueSummary() {

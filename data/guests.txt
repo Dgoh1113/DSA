@@ -1,4 +1,8 @@
-G1000|Alice Tan|980101-14-1234|012-3456789|alice@test.com|DIAMOND
-G1001|Bob Lim|950202-10-5678|019-8765432|bob@test.com|GOLD
-G1002|Charlie Brown|900303-08-9012|011-11112222|charlie@brown.com|STANDARD
-G1003|sih|111111111|111111111|111@gmauil.com|STANDARD
+G1001|Joey Miller|940512-14-1122|012-5551122|joey.miller@test.com|STANDARD
+G1002|Birdy Clark|960823-08-3344|016-4443344|birdy.clark@test.com|SILVER
+G1003|Damien White|910214-10-5566|019-3335566|damien.white@test.com|GOLD
+G1004|Jude Harris|890630-07-7788|017-2227788|jude.harris@test.com|PLATINUM
+G1005|Kaizen Scott|981105-03-9900|018-1119900|kaizen.scott@test.com|DIAMOND
+G1006|Elvin Young|930419-14-2233|014-9992233|elvin.young@test.com|STANDARD
+G1007|Roxy King|950928-08-4455|012-8884455|roxy.king@test.com|SILVER
+G1008|Eason Smith|950928-08-4455|012-8884488|eason.smith@test.com|DIAMOND
