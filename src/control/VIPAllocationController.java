@@ -3,6 +3,7 @@ package control;
 import adt.BinaryMaxHeap;
 import adt.BinarySearchTree;
 import adt.DoublyLinkedList;
+import adt.SortAlgorithms;
 import entity.Guest;
 import entity.LoyaltyAccount;
 import entity.Reservation;
@@ -233,6 +234,18 @@ public class VIPAllocationController {
             Reservation reservation = reservations.getEntry(i).getReservation();
             summary.add(reservation);
         }
+        int availableStandardRooms = 0;
+        int availableDeluxeRooms = 0;
+        int availableSuiteRooms = 0;
+        for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
+            Room room = roomInventory.getEntry(i);
+            if (!"AVAILABLE".equals(room.getStatus())) continue;
+            if ("STANDARD".equals(room.getRoomType())) availableStandardRooms++;
+            else if ("DELUXE".equals(room.getRoomType())) availableDeluxeRooms++;
+            else if ("SUITE".equals(room.getRoomType())) availableSuiteRooms++;
+        }
+        summary.setAvailableRoomCounts(availableStandardRooms, availableDeluxeRooms,
+                availableSuiteRooms);
         return summary;
     }
 
@@ -246,6 +259,56 @@ public class VIPAllocationController {
             }
         }
         return report;
+    }
+
+    /**
+     * Produces a management report for VIP allocation demand. The method
+     * searches the reservation registry using all three supplied criteria,
+     * then uses MergeSort to rank the matching VIP reservations by priority.
+     *
+     * @param minimumTier lowest tier to include (SILVER through DIAMOND)
+     * @param roomType requested room type, or ALL
+     * @param bookingStatus reservation status, or ALL
+     */
+    public VIPAllocationDemandReport generateVIPAllocationDemandReport(
+            String minimumTier, String roomType, String bookingStatus) {
+        int minimumTierWeight = getTierWeight(minimumTier);
+        DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+
+        // Search/filter all VIP reservations by tier, room type, and status.
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            Guest guest = reservation == null ? null : reservation.getGuest();
+            if (guest == null || guest.getTierWeight() < minimumTierWeight) {
+                continue;
+            }
+            if (!"ALL".equals(roomType) && !roomType.equals(reservation.getRoomType())) {
+                continue;
+            }
+            if (!"ALL".equals(bookingStatus) && !bookingStatus.equals(reservation.getBookingStatus())) {
+                continue;
+            }
+            matches.add(reservation);
+        }
+
+        // Sort filtered results from highest to lowest room-assignment priority.
+        DoublyLinkedList<Reservation> sortedMatches = SortAlgorithms.mergeSort(matches,
+                (first, second) -> {
+                    int priorityComparison = Integer.compare(
+                            second.getPriorityScore(), first.getPriorityScore());
+                    return priorityComparison != 0
+                            ? priorityComparison
+                            : first.getConfirmationNo().compareTo(second.getConfirmationNo());
+                });
+        return new VIPAllocationDemandReport(minimumTier, roomType, bookingStatus, sortedMatches);
+    }
+
+    private int getTierWeight(String tier) {
+        if ("DIAMOND".equals(tier)) return 4;
+        if ("PLATINUM".equals(tier)) return 3;
+        if ("GOLD".equals(tier)) return 2;
+        return 1; // SILVER is the lowest VIP tier.
     }
 
     /**
@@ -263,6 +326,7 @@ public class VIPAllocationController {
     public static class PriorityQueueSummary {
         private int pendingCount;
         private int highestPriorityScore;
+        private int totalPriorityScore;
         private int silverCount;
         private int goldCount;
         private int platinumCount;
@@ -270,10 +334,14 @@ public class VIPAllocationController {
         private int standardRoomCount;
         private int deluxeRoomCount;
         private int suiteRoomCount;
+        private int availableStandardRooms;
+        private int availableDeluxeRooms;
+        private int availableSuiteRooms;
 
         private void add(Reservation reservation) {
             pendingCount++;
             highestPriorityScore = Math.max(highestPriorityScore, reservation.getPriorityScore());
+            totalPriorityScore += reservation.getPriorityScore();
             String tier = reservation.getGuest() == null ? "" : reservation.getGuest().getLoyaltyTier();
             if ("SILVER".equals(tier)) silverCount++;
             else if ("GOLD".equals(tier)) goldCount++;
@@ -287,6 +355,9 @@ public class VIPAllocationController {
 
         public int getPendingCount() { return pendingCount; }
         public int getHighestPriorityScore() { return pendingCount == 0 ? 0 : highestPriorityScore; }
+        public double getAveragePriorityScore() {
+            return pendingCount == 0 ? 0.0 : totalPriorityScore * 1.0 / pendingCount;
+        }
         public int getSilverCount() { return silverCount; }
         public int getGoldCount() { return goldCount; }
         public int getPlatinumCount() { return platinumCount; }
@@ -294,6 +365,18 @@ public class VIPAllocationController {
         public int getStandardRoomCount() { return standardRoomCount; }
         public int getDeluxeRoomCount() { return deluxeRoomCount; }
         public int getSuiteRoomCount() { return suiteRoomCount; }
+        public int getAvailableStandardRooms() { return availableStandardRooms; }
+        public int getAvailableDeluxeRooms() { return availableDeluxeRooms; }
+        public int getAvailableSuiteRooms() { return availableSuiteRooms; }
+        public int getStandardRoomShortage() { return Math.max(0, standardRoomCount - availableStandardRooms); }
+        public int getDeluxeRoomShortage() { return Math.max(0, deluxeRoomCount - availableDeluxeRooms); }
+        public int getSuiteRoomShortage() { return Math.max(0, suiteRoomCount - availableSuiteRooms); }
+
+        private void setAvailableRoomCounts(int standard, int deluxe, int suite) {
+            availableStandardRooms = standard;
+            availableDeluxeRooms = deluxe;
+            availableSuiteRooms = suite;
+        }
     }
 
     public static class AllocationPerformanceReport {
@@ -322,6 +405,60 @@ public class VIPAllocationController {
         public int getCancelledBookings() { return cancelledBookings; }
         public double getAllocationRate() {
             return totalBookings == 0 ? 0.0 : allocatedBookings * 100.0 / totalBookings;
+        }
+    }
+
+    /** Management-ready result for the multi-criteria VIP demand report. */
+    public static class VIPAllocationDemandReport {
+        private final String minimumTier;
+        private final String roomType;
+        private final String bookingStatus;
+        private final DoublyLinkedList<Reservation> reservations;
+        private int pendingCount;
+        private int allocatedCount;
+        private int silverCount;
+        private int goldCount;
+        private int platinumCount;
+        private int diamondCount;
+
+        private VIPAllocationDemandReport(String minimumTier, String roomType,
+                                          String bookingStatus,
+                                          DoublyLinkedList<Reservation> reservations) {
+            this.minimumTier = minimumTier;
+            this.roomType = roomType;
+            this.bookingStatus = bookingStatus;
+            this.reservations = reservations;
+            summarise();
+        }
+
+        private void summarise() {
+            for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+                Reservation reservation = reservations.getEntry(i);
+                String status = reservation.getBookingStatus();
+                String tier = reservation.getGuest().getLoyaltyTier();
+                if ("PENDING".equals(status)) pendingCount++;
+                if ("CONFIRMED".equals(status) || "CHECKED_IN".equals(status)
+                        || "CHECKED_OUT".equals(status)) allocatedCount++;
+                if ("SILVER".equals(tier)) silverCount++;
+                else if ("GOLD".equals(tier)) goldCount++;
+                else if ("PLATINUM".equals(tier)) platinumCount++;
+                else if ("DIAMOND".equals(tier)) diamondCount++;
+            }
+        }
+
+        public String getMinimumTier() { return minimumTier; }
+        public String getRoomType() { return roomType; }
+        public String getBookingStatus() { return bookingStatus; }
+        public DoublyLinkedList<Reservation> getReservations() { return reservations; }
+        public int getTotalRequests() { return reservations.getNumberOfEntries(); }
+        public int getPendingCount() { return pendingCount; }
+        public int getAllocatedCount() { return allocatedCount; }
+        public int getSilverCount() { return silverCount; }
+        public int getGoldCount() { return goldCount; }
+        public int getPlatinumCount() { return platinumCount; }
+        public int getDiamondCount() { return diamondCount; }
+        public double getAllocationRate() {
+            return getTotalRequests() == 0 ? 0.0 : allocatedCount * 100.0 / getTotalRequests();
         }
     }
 

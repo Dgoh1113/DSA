@@ -58,6 +58,10 @@ public class VIPAllocationUI {
                     allocationPerformanceReport();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
+                case 7:
+                    vipAllocationDemandReport();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
                 case 0:
                     exitToMainMenu = true;
                     break;
@@ -78,8 +82,9 @@ public class VIPAllocationUI {
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " View VIP Priority Queue");
 
         utility.UIUtils.printSectionHeader("REPORTS & ANALYTICS", utility.UIUtils.YELLOW);
-        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Generate Priority Queue Summary Report");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Generate VIP Queue Demand Report");
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Generate Allocation Performance Report");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Generate VIP Allocation Demand Report (Filter + MergeSort)");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -256,21 +261,28 @@ DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
     }
 
     private void priorityQueueSummary() {
-        utility.UIUtils.printSubHeader("MODULE 2 > PRIORITY QUEUE SUMMARY", utility.UIUtils.YELLOW);
+        utility.UIUtils.printSubHeader("MODULE 2 > VIP QUEUE DEMAND REPORT", utility.UIUtils.YELLOW);
         VIPAllocationController.PriorityQueueSummary summary = controller.generatePriorityQueueSummary();
 
         System.out.println("+------------------------------------------+");
-        System.out.println("         PRIORITY QUEUE SUMMARY");
+        System.out.println("          VIP QUEUE DEMAND REPORT");
         System.out.println("+------------------------------------------+");
         System.out.println("  Pending VIPs       : " + summary.getPendingCount());
         System.out.println("  Highest Priority   : " + summary.getHighestPriorityScore());
+        System.out.printf("  Average Priority   : %.2f%n", summary.getAveragePriorityScore());
         System.out.println("  SILVER             : " + summary.getSilverCount());
         System.out.println("  GOLD               : " + summary.getGoldCount());
         System.out.println("  PLATINUM           : " + summary.getPlatinumCount());
         System.out.println("  DIAMOND            : " + summary.getDiamondCount());
-        System.out.println("  STANDARD Requests  : " + summary.getStandardRoomCount());
-        System.out.println("  DELUXE Requests    : " + summary.getDeluxeRoomCount());
-        System.out.println("  SUITE Requests     : " + summary.getSuiteRoomCount());
+        System.out.println("  Room Demand        : STANDARD=" + summary.getStandardRoomCount()
+            + " | DELUXE=" + summary.getDeluxeRoomCount()
+            + " | SUITE=" + summary.getSuiteRoomCount());
+        System.out.println("  Rooms Available    : STANDARD=" + summary.getAvailableStandardRooms()
+            + " | DELUXE=" + summary.getAvailableDeluxeRooms()
+            + " | SUITE=" + summary.getAvailableSuiteRooms());
+        System.out.println("  Room Shortage      : STANDARD=" + summary.getStandardRoomShortage()
+            + " | DELUXE=" + summary.getDeluxeRoomShortage()
+            + " | SUITE=" + summary.getSuiteRoomShortage());
         System.out.println("+------------------------------------------+");
     }
 
@@ -287,6 +299,65 @@ DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
         System.out.println("  Cancelled Bookings : " + report.getCancelledBookings());
         System.out.printf("  Allocation Rate     : %.2f%%%n", report.getAllocationRate());
         System.out.println("+------------------------------------------+");
+    }
+
+    /** Collects three management filters and displays the priority-ranked results. */
+    private void vipAllocationDemandReport() {
+        utility.UIUtils.printSubHeader("MODULE 2 > VIP ALLOCATION DEMAND REPORT", utility.UIUtils.YELLOW);
+        String minimumTier = readReportChoice("Minimum tier (SILVER | GOLD | PLATINUM | DIAMOND): ",
+                "SILVER|GOLD|PLATINUM|DIAMOND");
+        String roomType = readReportChoice("Room type (ALL | STANDARD | DELUXE | SUITE): ",
+                "ALL|STANDARD|DELUXE|SUITE");
+        String bookingStatus = readReportChoice(
+                "Status (ALL | PENDING | CONFIRMED | CHECKED_IN | CHECKED_OUT | CANCELLED): ",
+                "ALL|PENDING|CONFIRMED|CHECKED_IN|CHECKED_OUT|CANCELLED");
+
+        VIPAllocationController.VIPAllocationDemandReport report =
+                controller.generateVIPAllocationDemandReport(minimumTier, roomType, bookingStatus);
+        DoublyLinkedList<Reservation> reservations = report.getReservations();
+
+        System.out.println("\n+--------------------------------------------------------------------------------------------------+");
+        System.out.println("                         VIP ALLOCATION DEMAND REPORT");
+        System.out.println("+--------------------------------------------------------------------------------------------------+");
+        System.out.println("  Filters: Minimum Tier = " + report.getMinimumTier()
+                + " | Room Type = " + report.getRoomType()
+                + " | Status = " + report.getBookingStatus());
+        System.out.println("  Search: reservation registry scan  |  Sort: MergeSort by priority (highest first)");
+        System.out.println("+-----+--------------+----------------------+----------+----------+----------+------------+------------+");
+        System.out.println("| No. | Confirmation | Guest Name           | Tier     | Room     | Priority | Check-In   | Status     |");
+        System.out.println("+-----+--------------+----------------------+----------+----------+----------+------------+------------+");
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            String guestName = reservation.getGuest() == null ? "N/A" : reservation.getGuest().getName();
+            String tier = reservation.getGuest() == null ? "N/A" : reservation.getGuest().getLoyaltyTier();
+            System.out.printf("| %-3d | %-12s | %-20s | %-8s | %-8s | %-8d | %-10s | %-10s |%n",
+                    i, reservation.getConfirmationNo(), guestName, tier, reservation.getRoomType(),
+                    reservation.getPriorityScore(), reservation.getCheckInDate(), reservation.getBookingStatus());
+        }
+        if (reservations.isEmpty()) {
+            System.out.println("|                              No VIP reservations match the selected filters.                         |");
+        }
+        System.out.println("+-----+--------------+----------------------+----------+----------+----------+------------+------------+");
+        System.out.println("  Total Requests : " + report.getTotalRequests()
+                + " | Pending: " + report.getPendingCount()
+                + " | Allocated: " + report.getAllocatedCount());
+        System.out.printf("  Allocation Rate: %.2f%%%n", report.getAllocationRate());
+        System.out.println("  Tier Breakdown : Silver=" + report.getSilverCount() + " | Gold=" + report.getGoldCount()
+                + " | Platinum=" + report.getPlatinumCount() + " | Diamond=" + report.getDiamondCount());
+        System.out.println("+--------------------------------------------------------------------------------------------------+");
+    }
+
+    private String readReportChoice(String prompt, String permittedChoices) {
+        while (true) {
+            System.out.print("  " + prompt);
+            // Read the complete line so the post-report navigation prompt does
+            // not immediately consume a leftover newline and clear the report.
+            String choice = scanner.nextLine().trim().toUpperCase();
+            if (("|" + permittedChoices + "|").contains("|" + choice + "|")) {
+                return choice;
+            }
+            System.out.println("  [!] Invalid option. Choose from: " + permittedChoices.replace("|", " | "));
+        }
     }
 
     private int readInt() {
