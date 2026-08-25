@@ -108,7 +108,7 @@ public class FrontDeskUI {
             System.out.println("No confirmed bookings are currently available for check-in.");
             return;
         }
-        displayEligibleReservations("BOOKINGS AVAILABLE FOR CHECK-IN", eligible);
+        displayCheckInReservations(eligible);
         System.out.print("Enter Confirmation No: ");
         String confirmNo = utility.UIUtils.safeReadLine(scanner);
 
@@ -307,6 +307,24 @@ public class FrontDeskUI {
     private void displayEligibleReservations(String title,
                                               DoublyLinkedList<Reservation> reservations) {
         displayReservationChoices(title, reservations, false);
+    }
+
+    private void displayCheckInReservations(DoublyLinkedList<Reservation> reservations) {
+        System.out.println("\nBOOKINGS AVAILABLE FOR CHECK-IN");
+        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
+        System.out.println("| No. | Confirmation   | Guest Name     | Loyalty Tier   | Check-In | Status     |");
+        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            Guest guest = reservation.getGuest() != null
+                    ? reservation.getGuest() : controller.findGuest(reservation.getGuestId());
+            String guestName = guest == null ? "N/A" : guest.getName();
+            String loyaltyTier = guest == null ? "N/A" : guest.getLoyaltyTier();
+            System.out.printf("| %-3d | %-14s | %-14s | %-14s | %-8s | %-10s |%n",
+                    i, reservation.getConfirmationNo(), guestName, loyaltyTier,
+                    reservation.getCheckInDate(), reservation.getBookingStatus());
+        }
+        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
     }
 
     private void displayReservationChoices(String title,

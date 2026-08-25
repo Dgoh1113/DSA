@@ -384,18 +384,20 @@ public class LoyaltyUI {
             return;
         }
 
-        System.out.println("+-----+----------------+-----------+----------+-------------+");
-        System.out.println("| No. | Member ID      | Points    | Tier     | Expiry Date |");
-        System.out.println("+-----+----------------+-----------+----------+-------------+");
+        System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
+        System.out.println("| No. | Member ID      | Member Name          | Points    | Tier     | Expiry Date |");
+        System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
 
         for (int i = 1; i <= all.getNumberOfEntries(); i++) {
             LoyaltyAccount acc = all.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-9d | %-8s | %-11s |%n",
-                    i, acc.getMemberId(), acc.getTotalPoints(),
+            Guest guest = controller.viewMemberGuest(acc.getMemberId());
+            String memberName = guest != null ? guest.getName() : "N/A";
+            System.out.printf("| %-3d | %-14s | %-20s | %-9d | %-8s | %-11s |%n",
+                    i, acc.getMemberId(), memberName, acc.getTotalPoints(),
                     acc.getTierStatus(),
                     acc.getPointsExpiryDate() != null ? acc.getPointsExpiryDate() : "N/A");
         }
-        System.out.println("+-----+----------------+-----------+----------+-------------+");
+        System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
     }
 
     /** Builds a multi-criteria operational summary for management review. */
