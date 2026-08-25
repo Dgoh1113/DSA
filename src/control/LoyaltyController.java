@@ -342,6 +342,57 @@ public class LoyaltyController {
     }
 
     /**
+     * Builds a management-ready loyalty report by searching member records,
+     * applying all selected filters, then ranking the matches by points.
+     *
+     * @param tierFilter       A loyalty tier, or ALL for every tier.
+     * @param minimumPoints    Minimum current points required.
+     * @param expiryWithinDays Positive value filters to points expiring in that
+     *                         period; zero disables the expiry filter.
+     * @param memberSearchTerm Optional member ID or guest-name search text.
+     */
+    public DoublyLinkedList<ManagementReportEntry> generateManagementReport(
+            String tierFilter, int minimumPoints, int expiryWithinDays,
+            String memberSearchTerm) {
+        ensureAllGuestsHaveAccounts();
+        DoublyLinkedList<ManagementReportEntry> matches = new DoublyLinkedList<>();
+        String normalizedTier = tierFilter == null ? "ALL" : tierFilter.trim().toUpperCase();
+        String normalizedSearch = memberSearchTerm == null
+                ? "" : memberSearchTerm.trim().toLowerCase();
+        int pointsThreshold = Math.max(0, minimumPoints);
+
+        for (int i = 1; i <= loyaltyAccounts.getNumberOfEntries(); i++) {
+            LoyaltyAccount account = loyaltyAccounts.getEntry(i);
+            Guest guest = findGuest(account.getMemberId()); // member-record search
+            String guestName = guest == null ? "Unknown" : guest.getName();
+
+            boolean matchesTier = "ALL".equals(normalizedTier)
+                    || normalizedTier.equals(account.getTierStatus());
+            boolean matchesPoints = account.getTotalPoints() >= pointsThreshold;
+            boolean matchesExpiry = expiryWithinDays <= 0
+                    || hasExpiryWithinDays(account.getPointsExpiryDate(), expiryWithinDays);
+            boolean matchesSearch = normalizedSearch.isEmpty()
+                    || account.getMemberId().toLowerCase().contains(normalizedSearch)
+                    || guestName.toLowerCase().contains(normalizedSearch);
+
+            if (matchesTier && matchesPoints && matchesExpiry && matchesSearch) {
+                matches.add(new ManagementReportEntry(
+                        account.getMemberId(), guestName, account.getTierStatus(),
+                        account.getTotalPoints(), account.getPointsExpiryDate(),
+                        countRedemptions(account.getMemberId())));
+            }
+        }
+
+        // Stable MergeSort creates a management ranking: highest points first,
+        // then member ID for consistent ordering when points are equal.
+        return SortAlgorithms.mergeSort(matches, (first, second) -> {
+            int pointComparison = Integer.compare(second.getTotalPoints(), first.getTotalPoints());
+            return pointComparison != 0 ? pointComparison
+                    : first.getMemberId().compareTo(second.getMemberId());
+        });
+    }
+
+    /**
      * Retrieves the transaction history for a specific member.
      */
     public DoublyLinkedList<RedemptionTransaction> getTransactionHistory(String memberId) {
@@ -353,6 +404,33 @@ public class LoyaltyController {
             }
         }
         return history;
+    }
+
+    /** Value object used by the multi-filter loyalty management report. */
+    public static class ManagementReportEntry {
+        private final String memberId;
+        private final String memberName;
+        private final String tier;
+        private final int totalPoints;
+        private final String expiryDate;
+        private final int redemptionCount;
+
+        public ManagementReportEntry(String memberId, String memberName, String tier,
+                                     int totalPoints, String expiryDate, int redemptionCount) {
+            this.memberId = memberId;
+            this.memberName = memberName;
+            this.tier = tier;
+            this.totalPoints = totalPoints;
+            this.expiryDate = expiryDate;
+            this.redemptionCount = redemptionCount;
+        }
+
+        public String getMemberId() { return memberId; }
+        public String getMemberName() { return memberName; }
+        public String getTier() { return tier; }
+        public int getTotalPoints() { return totalPoints; }
+        public String getExpiryDate() { return expiryDate; }
+        public int getRedemptionCount() { return redemptionCount; }
     }
 
     /**
@@ -481,6 +559,28 @@ public class LoyaltyController {
             }
         }
         return null;
+    }
+
+    private int countRedemptions(String memberId) {
+        int count = 0;
+        for (int i = 1; i <= redemptionLog.getNumberOfEntries(); i++) {
+            RedemptionTransaction transaction = redemptionLog.getEntry(i);
+            if (transaction != null && memberId.equalsIgnoreCase(transaction.getMemberId())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private boolean hasExpiryWithinDays(String expiryDate, int days) {
+        if (expiryDate == null || expiryDate.trim().isEmpty()) return false;
+        try {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            java.time.LocalDate expiry = java.time.LocalDate.parse(expiryDate);
+            return !expiry.isBefore(today) && !expiry.isAfter(today.plusDays(days));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void removeTransaction(RedemptionTransaction transaction) {

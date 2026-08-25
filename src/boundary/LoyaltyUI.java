@@ -60,6 +60,10 @@ public class LoyaltyUI {
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 7:
+                    managementReportGenerator();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 8:
                     viewAllMembers();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
@@ -83,7 +87,8 @@ public class LoyaltyUI {
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Report: Top Point Earners (MergeSort O(n log n))");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Report: Expiring Points (QuickSort O(n log n))");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Report: Members by Tier");
-        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " View All Members");
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Report Generator (Search + Multi-Filter + MergeSort)");
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " View All Members");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -393,6 +398,68 @@ public class LoyaltyUI {
                     acc.getPointsExpiryDate() != null ? acc.getPointsExpiryDate() : "N/A");
         }
         System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
+    }
+
+    /** Builds a multi-criteria operational summary for management review. */
+    private void managementReportGenerator() {
+        utility.UIUtils.printSubHeader("MODULE 4 > LOYALTY REPORT GENERATOR", utility.UIUtils.MAGENTA);
+        System.out.println("Create a ranked loyalty summary using member search and multiple filters.");
+
+        String tierFilter;
+        do {
+            System.out.print("Tier filter (ALL / STANDARD / SILVER / GOLD / PLATINUM / DIAMOND): ");
+            tierFilter = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+            if (tierFilter.isEmpty()) tierFilter = "ALL";
+        } while (!"ALL".equals(tierFilter) && !"STANDARD".equals(tierFilter)
+                && !"SILVER".equals(tierFilter) && !"GOLD".equals(tierFilter)
+                && !"PLATINUM".equals(tierFilter) && !"DIAMOND".equals(tierFilter));
+
+        System.out.print("Minimum points (0 for no minimum): ");
+        int minimumPoints = Math.max(0, utility.UIUtils.safeReadInt(scanner));
+        System.out.print("Points expiry window in days (0 to ignore expiry): ");
+        int expiryWindow = Math.max(0, utility.UIUtils.safeReadInt(scanner));
+        System.out.print("Search by member ID or member name (press ENTER for all): ");
+        String memberSearch = utility.UIUtils.safeReadLine(scanner);
+
+        DoublyLinkedList<LoyaltyController.ManagementReportEntry> report =
+                controller.generateManagementReport(
+                        tierFilter, minimumPoints, expiryWindow, memberSearch);
+
+        System.out.println("\n+============================================================================+ ");
+        System.out.println("                 LOYALTY & REWARDS MANAGEMENT REPORT");
+        System.out.println("+============================================================================+");
+        System.out.println("  Tier filter     : " + tierFilter);
+        System.out.println("  Minimum points  : " + minimumPoints);
+        System.out.println("  Expiry filter   : " + (expiryWindow == 0 ? "Not applied"
+                : "Expires within " + expiryWindow + " days"));
+        System.out.println("  Member search   : " + (memberSearch.isEmpty() ? "All members" : memberSearch));
+        System.out.println("+-----+----------------+--------------------+----------+--------+------------+-------+");
+        System.out.println("| No. | Member ID      | Member Name        | Tier     | Points | Expiry     | Txns  |");
+        System.out.println("+-----+----------------+--------------------+----------+--------+------------+-------+");
+
+        if (report.isEmpty()) {
+            System.out.println("|                         No members match the selected filters.              |");
+            System.out.println("+-----+----------------+--------------------+----------+--------+------------+-------+");
+            return;
+        }
+
+        int totalPoints = 0;
+        int totalTransactions = 0;
+        for (int i = 1; i <= report.getNumberOfEntries(); i++) {
+            LoyaltyController.ManagementReportEntry entry = report.getEntry(i);
+            totalPoints += entry.getTotalPoints();
+            totalTransactions += entry.getRedemptionCount();
+            String expiry = entry.getExpiryDate() == null || entry.getExpiryDate().isEmpty()
+                    ? "N/A" : entry.getExpiryDate();
+            System.out.printf("| %-3d | %-14s | %-18s | %-8s | %-6d | %-10s | %-5d |%n",
+                    i, entry.getMemberId(), entry.getMemberName(), entry.getTier(),
+                    entry.getTotalPoints(), expiry, entry.getRedemptionCount());
+        }
+        System.out.println("+-----+----------------+--------------------+----------+--------+------------+-------+");
+        System.out.println("  Matched members       : " + report.getNumberOfEntries());
+        System.out.println("  Total points held     : " + totalPoints);
+        System.out.println("  Redemption transactions: " + totalTransactions);
+        System.out.println("  Method: linear member search + multi-criteria filtering + MergeSort ranking.");
     }
 
     private int readInt() {
