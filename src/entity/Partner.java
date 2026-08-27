@@ -1,145 +1,135 @@
+// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
 package entity;
 
-/**
- * Entity: Partner — Strategic Partner company profile.
- * Represents property developers, renovation contractors, electrical contractors,
- * and interior design firms that introduce products and services to customers.
- * Pure data blueprint — no business logic.
- */
 public class Partner {
+   private static int idCounter = 1000;
+   private String partnerId = generateId();
+   private String companyName;
+   private String partnerCategory;
+   private String contactPerson;
+   private String contactPhone;
+   private String email;
+   private String offeredServices;
+   private int totalReferralsCount;
+   private double totalRevenueGenerated;
 
-    private static int idCounter = 1000;
+   public Partner() {
+      this.totalReferralsCount = 0;
+      this.totalRevenueGenerated = (double)0.0F;
+   }
 
-    private String partnerId;          // PK, auto-generated (e.g. "P1001")
-    private String companyName;        // e.g., "Sime Darby Property", "SP Setia", "Sunway Property"
-    private String partnerCategory;    // PROPERTY_DEVELOPER, RENOVATION_CONTRACTOR, ELECTRICAL_CONTRACTOR, INTERIOR_DESIGN_FIRM
-    private String contactPerson;
-    private String contactPhone;
-    private String email;
-    private String offeredServices;    // Description of products/services introduced
-    private int totalReferralsCount;   // Number of successful customer introductions
-    private double totalRevenueGenerated; // Total transaction revenue generated
+   public Partner(String var1, String var2, String var3, String var4, String var5, String var6) {
+      this.companyName = var1;
+      this.partnerCategory = var2;
+      this.contactPerson = var3;
+      this.contactPhone = var4;
+      this.email = var5;
+      this.offeredServices = var6;
+      this.totalReferralsCount = 0;
+      this.totalRevenueGenerated = (double)0.0F;
+   }
 
-    public Partner() {
-        this.partnerId = generateId();
-        this.totalReferralsCount = 0;
-        this.totalRevenueGenerated = 0.0;
-    }
+   private static String generateId() {
+      int var10000 = idCounter++;
+      return "P" + var10000;
+   }
 
-    public Partner(String companyName, String partnerCategory, String contactPerson,
-                   String contactPhone, String email, String offeredServices) {
-        this.partnerId = generateId();
-        this.companyName = companyName;
-        this.partnerCategory = partnerCategory;
-        this.contactPerson = contactPerson;
-        this.contactPhone = contactPhone;
-        this.email = email;
-        this.offeredServices = offeredServices;
-        this.totalReferralsCount = 0;
-        this.totalRevenueGenerated = 0.0;
-    }
+   public static void updateIdCounter(int var0) {
+      if (var0 > idCounter) {
+         idCounter = var0;
+      }
 
-    private static String generateId() {
-        return "P" + (idCounter++);
-    }
+   }
 
-    public static void updateIdCounter(int nextVal) {
-        if (nextVal > idCounter) {
-            idCounter = nextVal;
-        }
-    }
+   public String getPartnerId() {
+      return this.partnerId;
+   }
 
-    // --- Getters & Setters ---
+   public void setPartnerId(String var1) {
+      this.partnerId = var1;
+   }
 
-    public String getPartnerId() {
-        return partnerId;
-    }
+   public String getCompanyName() {
+      return this.companyName;
+   }
 
-    public void setPartnerId(String partnerId) {
-        this.partnerId = partnerId;
-    }
+   public void setCompanyName(String var1) {
+      this.companyName = var1;
+   }
 
-    public String getCompanyName() {
-        return companyName;
-    }
+   public String getPartnerCategory() {
+      return this.partnerCategory;
+   }
 
-    public void setCompanyName(String companyName) {
-        this.companyName = companyName;
-    }
+   public void setPartnerCategory(String var1) {
+      this.partnerCategory = var1;
+   }
 
-    public String getPartnerCategory() {
-        return partnerCategory;
-    }
+   public String getContactPerson() {
+      return this.contactPerson;
+   }
 
-    public void setPartnerCategory(String partnerCategory) {
-        this.partnerCategory = partnerCategory;
-    }
+   public void setContactPerson(String var1) {
+      this.contactPerson = var1;
+   }
 
-    public String getContactPerson() {
-        return contactPerson;
-    }
+   public String getContactPhone() {
+      return this.contactPhone;
+   }
 
-    public void setContactPerson(String contactPerson) {
-        this.contactPerson = contactPerson;
-    }
+   public void setContactPhone(String var1) {
+      this.contactPhone = var1;
+   }
 
-    public String getContactPhone() {
-        return contactPhone;
-    }
+   public String getEmail() {
+      return this.email;
+   }
 
-    public void setContactPhone(String contactPhone) {
-        this.contactPhone = contactPhone;
-    }
+   public void setEmail(String var1) {
+      this.email = var1;
+   }
 
-    public String getEmail() {
-        return email;
-    }
+   public String getOfferedServices() {
+      return this.offeredServices;
+   }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
+   public void setOfferedServices(String var1) {
+      this.offeredServices = var1;
+   }
 
-    public String getOfferedServices() {
-        return offeredServices;
-    }
+   public int getTotalReferralsCount() {
+      return this.totalReferralsCount;
+   }
 
-    public void setOfferedServices(String offeredServices) {
-        this.offeredServices = offeredServices;
-    }
+   public void setTotalReferralsCount(int var1) {
+      this.totalReferralsCount = var1;
+   }
 
-    public int getTotalReferralsCount() {
-        return totalReferralsCount;
-    }
+   public double getTotalRevenueGenerated() {
+      return this.totalRevenueGenerated;
+   }
 
-    public void setTotalReferralsCount(int totalReferralsCount) {
-        this.totalReferralsCount = totalReferralsCount;
-    }
+   public void setTotalRevenueGenerated(double var1) {
+      this.totalRevenueGenerated = var1;
+   }
 
-    public double getTotalRevenueGenerated() {
-        return totalRevenueGenerated;
-    }
+   public void incrementReferrals(double var1) {
+      ++this.totalReferralsCount;
+      this.totalRevenueGenerated += var1;
+   }
 
-    public void setTotalRevenueGenerated(double totalRevenueGenerated) {
-        this.totalRevenueGenerated = totalRevenueGenerated;
-    }
+   public boolean equals(Object var1) {
+      if (this == var1) {
+         return true;
+      } else if (var1 != null && this.getClass() == var1.getClass()) {
+         Partner var2 = (Partner)var1;
+         return this.partnerId != null && this.partnerId.equals(var2.partnerId);
+      } else {
+         return false;
+      }
+   }
 
-    public void incrementReferrals(double revenue) {
-        this.totalReferralsCount++;
-        this.totalRevenueGenerated += revenue;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null || getClass() != obj.getClass()) return false;
-        Partner other = (Partner) obj;
-        return partnerId != null && partnerId.equals(other.partnerId);
-    }
-
-    @Override
-    public String toString() {
-        return "Partner{id='" + partnerId + "', name='" + companyName
-                + "', category='" + partnerCategory + "', referrals=" + totalReferralsCount
-                + ", revenue=" + totalRevenueGenerated + "}";
-    }
+   public String toString() {
+      return "Partner{id='" + this.partnerId + "', name='" + this.companyName + "', category='" + this.partnerCategory + "', referrals=" + this.totalReferralsCount + ", revenue=" + this.totalRevenueGenerated + "}";
+   }
 }
