@@ -76,6 +76,30 @@ public class VIPAllocationController {
     }
 
     /**
+     * Registers a walk-in VIP booking from guest details entered at the desk.
+     * Reuses a registered guest when the contact number already exists.
+     */
+    public Reservation addVIPBooking(String name, String icPassport, String contactNo,
+                                     String email, String tier, String roomType,
+                                     String checkInDate, String checkOutDate) {
+        if (tier == null || "STANDARD".equalsIgnoreCase(tier.trim())) {
+            return null;
+        }
+        String normalizedTier = tier.trim().toUpperCase();
+
+        Guest guest = findGuestByContactNo(contactNo);
+        if (guest == null) {
+            guest = new Guest(name, icPassport, contactNo, email, normalizedTier);
+            guestRegistry.add(guest);
+            ensureLoyaltyAccount(guest, normalizedTier);
+        } else if (!guest.isVIP()) {
+            return null;
+        }
+
+        return createVIPReservation(guest, roomType, checkInDate, checkOutDate);
+    }
+
+    /**
      * Creates a VIP booking only for an existing, VIP-eligible guest.
      * The registry copy is used so a caller cannot supply an unregistered profile
      * or a manually altered loyalty tier.
@@ -122,6 +146,40 @@ public class VIPAllocationController {
         }
 
         return reservation;
+    }
+
+    private Guest findGuestByContactNo(String contactNo) {
+        if (contactNo == null) {
+            return null;
+        }
+        String needle = contactNo.replaceAll("[^0-9]", "");
+        if (needle.isEmpty()) {
+            return null;
+        }
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest == null || guest.getContactNo() == null) {
+                continue;
+            }
+            String existing = guest.getContactNo().replaceAll("[^0-9]", "");
+            if (needle.equals(existing)) {
+                return guest;
+            }
+        }
+        return null;
+    }
+
+    private void ensureLoyaltyAccount(Guest guest, String tier) {
+        if (loyaltyAccounts == null || guest == null) {
+            return;
+        }
+        if (getCurrentPointsByGuestId(guest.getGuestId()) != null) {
+            return;
+        }
+        LoyaltyAccount account = new LoyaltyAccount(guest.getGuestId());
+        account.setTierStatus(tier);
+        account.addHistoryEntry("VIP walk-in registration (" + tier + ")");
+        loyaltyAccounts.add(account);
     }
 
     /**
