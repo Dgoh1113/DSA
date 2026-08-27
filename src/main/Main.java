@@ -12,7 +12,9 @@ import control.PartnerController;
 import control.StandardBookingController;
 import control.VIPAllocationController;
 import control.VIPAllocationController.VIPReservation;
+import entity.BillingRecord;
 import entity.CustomerReferral;
+import entity.FrontDeskLog;
 import entity.Guest;
 import entity.LoyaltyAccount;
 import entity.Partner;
@@ -44,6 +46,11 @@ public class Main {
         DoublyLinkedList<RedemptionTransaction> redemptionLog   = new DoublyLinkedList<>();
         DoublyLinkedList<Partner> partnerRegistry               = new DoublyLinkedList<>();
         DoublyLinkedList<CustomerReferral> referralLog          = new DoublyLinkedList<>();
+        DoublyLinkedList<FrontDeskLog> checkInLog               = new DoublyLinkedList<>();
+        DoublyLinkedList<FrontDeskLog> checkOutLog              = new DoublyLinkedList<>();
+        DoublyLinkedList<FrontDeskLog> cancellationLog          = new DoublyLinkedList<>();
+        DoublyLinkedList<BillingRecord> billingLog              = new DoublyLinkedList<>();
+
 
         // ============================
         // Check & Load Persisted Text Files into ADTs
@@ -51,7 +58,8 @@ public class Main {
         if (utility.FilePersistenceUtils.dataFilesExist()) {
             utility.FilePersistenceUtils.loadAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue, searchTree,
-                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
+                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
+                checkInLog, checkOutLog, cancellationLog, billingLog
             );
         } else {
             // Seed Room Inventory (20 rooms)
@@ -124,7 +132,8 @@ public class Main {
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
                 searchTree,
-                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
+                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
+                checkInLog, checkOutLog, cancellationLog, billingLog
             );
         }
 
@@ -138,7 +147,10 @@ public class Main {
 
         LoyaltyController         mod4 = new LoyaltyController(masterRegistry, loyaltyAccounts, redemptionLog);
         mod4.setReservationResources(roomInventory, searchTree);
-        FrontDeskController       mod3 = new FrontDeskController(searchTree, masterRegistry, roomInventory, mod4);
+        FrontDeskController       mod3 = new FrontDeskController(
+                searchTree, masterRegistry, roomInventory, mod4,
+                checkInLog, checkOutLog, cancellationLog, billingLog);
+        mod3.backfillStoredRecordsIfEmpty();
         StandardBookingController mod1 = new StandardBookingController(standardQueue, masterRegistry, roomInventory, searchTree);
         VIPAllocationController   mod2 = new VIPAllocationController(vipQueue, masterRegistry, roomInventory, searchTree);
 
@@ -154,7 +166,8 @@ public class Main {
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
                 searchTree,
-                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
+                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
+                checkInLog, checkOutLog, cancellationLog, billingLog
             );
         }));
 
@@ -173,7 +186,8 @@ public class Main {
         utility.FilePersistenceUtils.saveAllData(
             masterRegistry, roomInventory, standardQueue, vipQueue,
             searchTree,
-            loyaltyAccounts, redemptionLog, partnerRegistry, referralLog
+            loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
+            checkInLog, checkOutLog, cancellationLog, billingLog
         );
     }
 }
