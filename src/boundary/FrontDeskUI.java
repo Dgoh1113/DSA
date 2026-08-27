@@ -74,7 +74,7 @@ public class FrontDeskUI {
 
         utility.UIUtils.printSectionHeader("SYSTEM RECORDS & INVENTORY", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " View All Reservations (BST In-Order Sorted)");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Inventory Status");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Availability Status");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -272,7 +272,7 @@ public class FrontDeskUI {
     }
 
     private void viewRoomStatus() {
-        utility.UIUtils.printSubHeader("MODULE 3 > VIEW ROOM INVENTORY STATUS", utility.UIUtils.GREEN);
+        utility.UIUtils.printSubHeader("MODULE 3 > VIEW ROOM AVAILABILITY STATUS", utility.UIUtils.GREEN);
         DoublyLinkedList<Room> rooms = controller.getRoomInventory();
 
         System.out.println("+--------+-----------+---------------+-------------+");
