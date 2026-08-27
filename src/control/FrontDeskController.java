@@ -3,8 +3,11 @@ package control;
 import adt.BinarySearchTree;
 import adt.DoublyLinkedList;
 import entity.Guest;
+import entity.LoyaltyAccount;
 import entity.Reservation;
 import entity.Room;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Controller: Module 3 — Front-Desk Service.
@@ -18,6 +21,15 @@ import entity.Room;
  * Receives shared ADT instances from Main.java.
  */
 public class FrontDeskController {
+
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_CONFIRMED = "CONFIRMED";
+    private static final String STATUS_CHECKED_IN = "CHECKED_IN";
+    private static final String STATUS_CHECKED_OUT = "CHECKED_OUT";
+    private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final String ROOM_AVAILABLE = "AVAILABLE";
+    private static final String ROOM_OCCUPIED = "OCCUPIED";
+    private static final String ROOM_MAINTENANCE = "MAINTENANCE";
 
     private BinarySearchTree<Reservation> searchTree;
     private DoublyLinkedList<Guest> guestRegistry;
@@ -64,35 +76,33 @@ public class FrontDeskController {
             return false;
         }
 
-        if (!"CONFIRMED".equals(reservation.getBookingStatus())) {
+        if (!STATUS_CONFIRMED.equals(reservation.getBookingStatus())) {
             return false; // Can only check in from CONFIRMED status
         }
 
-        reservation.setBookingStatus("CHECKED_IN");
-
-        // Mark room as occupied
-        Room room = findRoom(reservation.getAssignedRoomNo());
-        if (room != null) {
-            room.setStatus("OCCUPIED");
+        if (!isCheckInDateReached(reservation.getCheckInDate())) {
+            return false;
         }
 
-        // Update BST
-        searchTree.delete(reservation);
-        searchTree.insert(reservation);
+        Room room = findRoom(reservation.getAssignedRoomNo());
+        if (room == null || ROOM_MAINTENANCE.equals(room.getStatus())) {
+            return false;
+        }
 
-        // Record Undo Action
+        String previousRoomStatus = room.getStatus();
+        reservation.setBookingStatus(STATUS_CHECKED_IN);
+        room.setStatus(ROOM_OCCUPIED);
+
+        // Record Undo Action. Confirmed bookings already hold the room, so undo
+        // restores OCCUPIED rather than releasing inventory back to AVAILABLE.
         if (undoController != null) {
             undoController.recordAction(
                 "CHECK_IN",
                 "Module 3: Front-Desk Service",
                 "Check-In Conf #" + confirmationNo + " (Room " + reservation.getAssignedRoomNo() + ")",
                 () -> {
-                    reservation.setBookingStatus("CONFIRMED");
-                    if (room != null) {
-                        room.setStatus("AVAILABLE");
-                    }
-                    searchTree.delete(reservation);
-                    searchTree.insert(reservation);
+                    reservation.setBookingStatus(STATUS_CONFIRMED);
+                    room.setStatus(previousRoomStatus != null ? previousRoomStatus : ROOM_OCCUPIED);
                 }
             );
         }
@@ -113,46 +123,41 @@ public class FrontDeskController {
             return null;
         }
 
-        if (!"CHECKED_IN".equals(reservation.getBookingStatus())) {
+        if (!STATUS_CHECKED_IN.equals(reservation.getBookingStatus())) {
             return null; // Can only check out from CHECKED_IN status
         }
 
-        reservation.setBookingStatus("CHECKED_OUT");
+        reservation.setBookingStatus(STATUS_CHECKED_OUT);
 
-        // Free the room
         Room room = findRoom(reservation.getAssignedRoomNo());
-        if (room != null) {
-            room.setStatus("AVAILABLE");
+        Guest guest = findGuest(reservation.getGuestId());
+        int nights = calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate());
+        int pointsAwarded = 0;
 
-            // Trigger loyalty points accrual
-            if (loyaltyController != null) {
-                int nights = calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate());
-                if (nights <= 0) nights = 1; // minimum 1 night
-                Guest guest = findGuest(reservation.getGuestId());
-                if (guest != null) {
-                    loyaltyController.accruePointsByContactNo(guest.getContactNo(),
-                                                              room.getNightlyRate(), nights);
-                }
+        if (room != null) {
+            room.setStatus(ROOM_AVAILABLE);
+
+            if (loyaltyController != null && guest != null) {
+                pointsAwarded = (int) (room.getNightlyRate() * nights);
+                loyaltyController.accruePointsByContactNo(guest.getContactNo(),
+                                                          room.getNightlyRate(), nights);
             }
         }
 
-        // Update BST
-        searchTree.delete(reservation);
-        searchTree.insert(reservation);
+        final int pointsToReverse = pointsAwarded;
+        final Guest checkedOutGuest = guest;
 
-        // Record Undo Action
         if (undoController != null) {
             undoController.recordAction(
                 "CHECK_OUT",
                 "Module 3: Front-Desk Service",
                 "Check-Out Conf #" + confirmationNo + " (Room " + reservation.getAssignedRoomNo() + ")",
                 () -> {
-                    reservation.setBookingStatus("CHECKED_IN");
+                    reservation.setBookingStatus(STATUS_CHECKED_IN);
                     if (room != null) {
-                        room.setStatus("OCCUPIED");
+                        room.setStatus(ROOM_OCCUPIED);
                     }
-                    searchTree.delete(reservation);
-                    searchTree.insert(reservation);
+                    reverseAccruedPoints(checkedOutGuest, pointsToReverse, confirmationNo);
                 }
             );
         }
@@ -172,25 +177,20 @@ public class FrontDeskController {
             return false;
         }
 
-        if (!"PENDING".equals(reservation.getBookingStatus())
-                && !"CONFIRMED".equals(reservation.getBookingStatus())) {
+        if (!STATUS_PENDING.equals(reservation.getBookingStatus())
+                && !STATUS_CONFIRMED.equals(reservation.getBookingStatus())) {
             return false;
         }
 
         String prevStatus = reservation.getBookingStatus();
-        reservation.setBookingStatus("CANCELLED");
+        reservation.setBookingStatus(STATUS_CANCELLED);
 
-        // Free room if one was assigned
         Room room = findRoom(reservation.getAssignedRoomNo());
-        if (room != null) {
-            room.setStatus("AVAILABLE");
+        String previousRoomStatus = room != null ? room.getStatus() : null;
+        if (room != null && STATUS_CONFIRMED.equals(prevStatus)) {
+            room.setStatus(ROOM_AVAILABLE);
         }
 
-        // Update BST
-        searchTree.delete(reservation);
-        searchTree.insert(reservation);
-
-        // Record Undo Action
         if (undoController != null) {
             undoController.recordAction(
                 "CANCEL_RESERVATION",
@@ -198,11 +198,10 @@ public class FrontDeskController {
                 "Cancelled Conf #" + confirmationNo,
                 () -> {
                     reservation.setBookingStatus(prevStatus);
-                    if (room != null && "CONFIRMED".equals(prevStatus)) {
-                        room.setStatus("OCCUPIED");
+                    if (room != null && STATUS_CONFIRMED.equals(prevStatus)
+                            && ROOM_AVAILABLE.equals(room.getStatus())) {
+                        room.setStatus(previousRoomStatus != null ? previousRoomStatus : ROOM_OCCUPIED);
                     }
-                    searchTree.delete(reservation);
-                    searchTree.insert(reservation);
                 }
             );
         }
@@ -241,8 +240,8 @@ public class FrontDeskController {
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation reservation = reservations.getEntry(i);
             if (reservation != null
-                    && ("PENDING".equals(reservation.getBookingStatus())
-                    || "CONFIRMED".equals(reservation.getBookingStatus()))) {
+                    && (STATUS_PENDING.equals(reservation.getBookingStatus())
+                    || STATUS_CONFIRMED.equals(reservation.getBookingStatus()))) {
                 matches.add(reservation);
             }
         }
@@ -290,25 +289,60 @@ public class FrontDeskController {
         return roomInventory;
     }
 
-    /**
-     * Simple night calculation from date strings (format: "YYYY-MM-DD").
-     * Returns the difference in days, or 1 if parsing fails.
-     */
-    private int calculateNights(String checkIn, String checkOut) {
-        try {
-            if (checkIn == null || checkOut == null) return 1;
-            // Simple parsing for YYYY-MM-DD format
-            String[] inParts = checkIn.split("-");
-            String[] outParts = checkOut.split("-");
-            int inDay = Integer.parseInt(inParts[2]);
-            int outDay = Integer.parseInt(outParts[2]);
-            int inMonth = Integer.parseInt(inParts[1]);
-            int outMonth = Integer.parseInt(outParts[1]);
+    /** Returns true when the confirmation number is an 8-digit value. */
+    public boolean isValidConfirmationNo(String confirmationNo) {
+        return confirmationNo != null && confirmationNo.matches("\\d{8}");
+    }
 
-            int nights = (outMonth - inMonth) * 30 + (outDay - inDay);
-            return (nights > 0) ? nights : 1;
-        } catch (Exception e) {
+    /** Returns true when today's date is on or after the booked check-in date. */
+    public boolean isCheckInDateReached(String checkInDate) {
+        LocalDate parsed = parseDate(checkInDate);
+        if (parsed == null) {
+            return true;
+        }
+        return !LocalDate.now().isBefore(parsed);
+    }
+
+    /**
+     * Night calculation from date strings (format: YYYY-MM-DD).
+     * Uses calendar dates so month and year boundaries are counted correctly.
+     */
+    public int calculateNights(String checkIn, String checkOut) {
+        LocalDate inDate = parseDate(checkIn);
+        LocalDate outDate = parseDate(checkOut);
+        if (inDate == null || outDate == null) {
             return 1;
         }
+        long nights = ChronoUnit.DAYS.between(inDate, outDate);
+        return (nights > 0) ? (int) nights : 1;
+    }
+
+    private LocalDate parseDate(String date) {
+        if (date == null || date.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(date.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Reverses points credited at check-out using LoyaltyController public APIs
+     * without changing Module 4 source.
+     */
+    private void reverseAccruedPoints(Guest guest, int pointsAwarded, String confirmationNo) {
+        if (loyaltyController == null || guest == null || pointsAwarded <= 0) {
+            return;
+        }
+        LoyaltyAccount account = loyaltyController.findAccount(guest.getGuestId());
+        if (account == null) {
+            return;
+        }
+        int restored = Math.max(0, account.getTotalPoints() - pointsAwarded);
+        account.setTotalPoints(restored);
+        account.addHistoryEntry("-" + pointsAwarded + " pts (Undo check-out Conf #" + confirmationNo + ")");
+        loyaltyController.checkAndUpgradeTier(guest.getGuestId());
     }
 }
