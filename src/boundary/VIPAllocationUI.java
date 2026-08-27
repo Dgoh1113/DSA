@@ -183,6 +183,11 @@ public class VIPAllocationUI {
 
         Reservation res = controller.addVIPBooking(name, icPassport, contactNo, email,
                                                     tier, roomType, checkIn, checkOut);
+        if (res == null) {
+            System.out.println("\n  [!] Booking failed. This contact belongs to a non-VIP member,");
+            System.out.println("      or the selected loyalty tier is not VIP eligible.");
+            return false;
+        }
 
         System.out.println("\n+------------------------------------------+");
         System.out.println("  VIP BOOKING REGISTERED!");
