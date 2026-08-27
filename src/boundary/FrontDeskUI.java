@@ -90,8 +90,10 @@ public class FrontDeskUI {
             return;
         }
         displayReservationChoices("ALL RESERVATIONS", reservations, true);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -108,9 +110,11 @@ public class FrontDeskUI {
             System.out.println("No confirmed bookings are currently available for check-in.");
             return;
         }
-        displayCheckInReservations(eligible);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        displayEligibleReservations("BOOKINGS AVAILABLE FOR CHECK-IN", eligible);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -120,6 +124,22 @@ public class FrontDeskUI {
 
         if (!"CONFIRMED".equals(res.getBookingStatus())) {
             System.out.println("Cannot check in. Current status: " + res.getBookingStatus());
+            System.out.println("Only CONFIRMED reservations can be checked in.");
+            return;
+        }
+
+        if (!controller.isCheckInDateReached(res.getCheckInDate())) {
+            System.out.println("Cannot check in before the booked check-in date: " + res.getCheckInDate());
+            return;
+        }
+
+        Room assignedRoom = controller.findRoom(res.getAssignedRoomNo());
+        if (assignedRoom == null) {
+            System.out.println("Cannot check in. No room has been assigned to this reservation.");
+            return;
+        }
+        if ("MAINTENANCE".equals(assignedRoom.getStatus())) {
+            System.out.println("Cannot check in. Room " + assignedRoom.getRoomNo() + " is under maintenance.");
             return;
         }
 
@@ -133,7 +153,8 @@ public class FrontDeskUI {
                 System.out.println("\n*** CHECK-IN SUCCESSFUL ***");
                 System.out.println("Guest has been checked in.");
             } else {
-                System.out.println("Check-in failed. Ensure rooms are available for PENDING status.");
+                System.out.println("Check-in failed. The reservation must be CONFIRMED,");
+                System.out.println("the check-in date must have been reached, and the assigned room must be usable.");
             }
         } else {
             System.out.println("Check-in cancelled.");
@@ -148,8 +169,10 @@ public class FrontDeskUI {
             return;
         }
         displayEligibleReservations("ROOMS AVAILABLE FOR CHECK-OUT", eligible);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -170,8 +193,10 @@ public class FrontDeskUI {
         if ("Y".equals(confirm)) {
             Reservation checkedOut = controller.checkOut(confirmNo);
             if (checkedOut != null) {
+                int nights = controller.calculateNights(checkedOut.getCheckInDate(), checkedOut.getCheckOutDate());
                 System.out.println("\n*** CHECK-OUT SUCCESSFUL ***");
                 System.out.println("Room " + checkedOut.getAssignedRoomNo() + " is now AVAILABLE.");
+                System.out.println("Stay duration: " + nights + (nights == 1 ? " night." : " nights."));
                 System.out.println("Loyalty points accrued to Guest ID: " + checkedOut.getGuestId());
             } else {
                 System.out.println("Check-out failed.");
@@ -189,8 +214,10 @@ public class FrontDeskUI {
             return;
         }
         displayReservationChoices("BOOKINGS AVAILABLE FOR CANCELLATION", eligible, true);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -309,24 +336,6 @@ public class FrontDeskUI {
         displayReservationChoices(title, reservations, false);
     }
 
-    private void displayCheckInReservations(DoublyLinkedList<Reservation> reservations) {
-        System.out.println("\nBOOKINGS AVAILABLE FOR CHECK-IN");
-        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
-        System.out.println("| No. | Confirmation   | Guest Name     | Loyalty Tier   | Check-In | Status     |");
-        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
-        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
-            Reservation reservation = reservations.getEntry(i);
-            Guest guest = reservation.getGuest() != null
-                    ? reservation.getGuest() : controller.findGuest(reservation.getGuestId());
-            String guestName = guest == null ? "N/A" : guest.getName();
-            String loyaltyTier = guest == null ? "N/A" : guest.getLoyaltyTier();
-            System.out.printf("| %-3d | %-14s | %-14s | %-14s | %-8s | %-10s |%n",
-                    i, reservation.getConfirmationNo(), guestName, loyaltyTier,
-                    reservation.getCheckInDate(), reservation.getBookingStatus());
-        }
-        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
-    }
-
     private void displayReservationChoices(String title,
                                              DoublyLinkedList<Reservation> reservations,
                                              boolean showStatus) {
@@ -362,11 +371,13 @@ public class FrontDeskUI {
         System.out.println();
     }
 
-    private int readInt() {
-        while (!scanner.hasNextInt()) {
-            System.out.print("Please enter a valid number: ");
-            scanner.next();
+    private String promptConfirmationNo() {
+        System.out.print("Enter Confirmation No (8 digits): ");
+        String confirmNo = utility.UIUtils.safeReadLine(scanner).trim();
+        if (!controller.isValidConfirmationNo(confirmNo)) {
+            System.out.println("Invalid confirmation number. Please enter an 8-digit number.");
+            return null;
         }
-        return scanner.nextInt();
+        return confirmNo;
     }
 }
