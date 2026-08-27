@@ -20,105 +20,112 @@ public class CustomerReferral {
     private String status;              // PENDING, COMPLETED, CANCELLED
 
     public CustomerReferral() {
-      this.status = "COMPLETED";
-   }
+        this.referralId = generateId();
+        this.status = "COMPLETED";
+    }
 
-   public CustomerReferral(String var1, String var2, String var3, String var4, String var5, double var6, String var8) {
-      this.partnerId = var1;
-      this.guestId = var2;
-      this.customerName = var3;
-      this.customerStage = var4;
-      this.productIntroduced = var5;
-      this.dealAmount = var6;
-      this.referralDate = var8;
-      this.status = "COMPLETED";
-   }
+    public CustomerReferral(String partnerId, String guestId, String customerName,
+                            String customerStage, String productIntroduced,
+                            double dealAmount, String referralDate) {
+        this.referralId = generateId();
+        this.partnerId = partnerId;
+        this.guestId = guestId;
+        this.customerName = customerName;
+        this.customerStage = customerStage;
+        this.productIntroduced = productIntroduced;
+        this.dealAmount = dealAmount;
+        this.referralDate = referralDate;
+        this.status = "COMPLETED";
+    }
 
-   private static String generateId() {
-      int var10000 = idCounter++;
-      return "REF" + var10000;
-   }
+    private static String generateId() {
+        return "REF" + (idCounter++);
+    }
 
-   public static void updateIdCounter(int var0) {
-      if (var0 > idCounter) {
-         idCounter = var0;
-      }
+    public static void updateIdCounter(int nextVal) {
+        if (nextVal > idCounter) {
+            idCounter = nextVal;
+        }
+    }
 
-   }
+    // --- Getters & Setters ---
 
-   public String getReferralId() {
-      return this.referralId;
-   }
+    public String getReferralId() {
+        return referralId;
+    }
 
-   public void setReferralId(String var1) {
-      this.referralId = var1;
-   }
+    public void setReferralId(String referralId) {
+        this.referralId = referralId;
+    }
 
-   public String getPartnerId() {
-      return this.partnerId;
-   }
+    public String getPartnerId() {
+        return partnerId;
+    }
 
-   public void setPartnerId(String var1) {
-      this.partnerId = var1;
-   }
+    public void setPartnerId(String partnerId) {
+        this.partnerId = partnerId;
+    }
 
-   public String getGuestId() {
-      return this.guestId;
-   }
+    public String getGuestId() {
+        return guestId;
+    }
 
-   public void setGuestId(String var1) {
-      this.guestId = var1;
-   }
+    public void setGuestId(String guestId) {
+        this.guestId = guestId;
+    }
 
-   public String getCustomerName() {
-      return this.customerName;
-   }
+    public String getCustomerName() {
+        return customerName;
+    }
 
-   public void setCustomerName(String var1) {
-      this.customerName = var1;
-   }
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
+    }
 
-   public String getCustomerStage() {
-      return this.customerStage;
-   }
+    public String getCustomerStage() {
+        return customerStage;
+    }
 
-   public void setCustomerStage(String var1) {
-      this.customerStage = var1;
-   }
+    public void setCustomerStage(String customerStage) {
+        this.customerStage = customerStage;
+    }
 
-   public String getProductIntroduced() {
-      return this.productIntroduced;
-   }
+    public String getProductIntroduced() {
+        return productIntroduced;
+    }
 
-   public void setProductIntroduced(String var1) {
-      this.productIntroduced = var1;
-   }
+    public void setProductIntroduced(String productIntroduced) {
+        this.productIntroduced = productIntroduced;
+    }
 
-   public double getDealAmount() {
-      return this.dealAmount;
-   }
+    public double getDealAmount() {
+        return dealAmount;
+    }
 
-   public void setDealAmount(double var1) {
-      this.dealAmount = var1;
-   }
+    public void setDealAmount(double dealAmount) {
+        this.dealAmount = dealAmount;
+    }
 
-   public String getReferralDate() {
-      return this.referralDate;
-   }
+    public String getReferralDate() {
+        return referralDate;
+    }
 
-   public void setReferralDate(String var1) {
-      this.referralDate = var1;
-   }
+    public void setReferralDate(String referralDate) {
+        this.referralDate = referralDate;
+    }
 
-   public String getStatus() {
-      return this.status;
-   }
+    public String getStatus() {
+        return status;
+    }
 
-   public void setStatus(String var1) {
-      this.status = var1;
-   }
+    public void setStatus(String status) {
+        this.status = status;
+    }
 
-   public String toString() {
-      return "CustomerReferral{id='" + this.referralId + "', partnerId='" + this.partnerId + "', customer='" + this.customerName + "', stage='" + this.customerStage + "', product='" + this.productIntroduced + "', dealAmount=" + this.dealAmount + "}";
-   }
+    @Override
+    public String toString() {
+        return "CustomerReferral{id='" + referralId + "', partnerId='" + partnerId
+                + "', customer='" + customerName + "', stage='" + customerStage
+                + "', product='" + productIntroduced + "', dealAmount=" + dealAmount + "}";
+    }
 }
