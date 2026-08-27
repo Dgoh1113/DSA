@@ -1,4 +1,3 @@
-// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
 package control;
 
 import adt.BinarySearchTree;
@@ -9,202 +8,258 @@ import entity.LoyaltyAccount;
 import entity.Reservation;
 import entity.Room;
 
+/**
+ * Controller: Module 1 — Walk-In Registrations & Standard Booking Procedure.
+ * Handles all LinkedQueue (FIFO) operations for standard (non-VIP) bookings.
+ *
+ * Business Rules:
+ * - Standard walk-in guests are served strictly in order of arrival.
+ * - enqueue() adds a guest to the waiting list in O(1).
+ * - dequeue() assigns the next available standard room in O(1).
+ * - When a room becomes available and the VIP heap is empty, the system
+ *   falls back here to serve the longest-waiting standard guest.
+ */
 public class StandardBookingController {
-   private LinkedQueue<Reservation> standardQueue;
-   private DoublyLinkedList<Guest> guestRegistry;
-   private DoublyLinkedList<Room> roomInventory;
-   private BinarySearchTree<Reservation> searchTree;
-   private UndoController undoController;
-   private LoyaltyController loyaltyController;
-   private static int arrivalCounter = 0;
 
-   public StandardBookingController(LinkedQueue<Reservation> var1, DoublyLinkedList<Guest> var2, DoublyLinkedList<Room> var3, BinarySearchTree<Reservation> var4) {
-      this.standardQueue = var1;
-      this.guestRegistry = var2;
-      this.roomInventory = var3;
-      this.searchTree = var4;
-   }
+    private LinkedQueue<Reservation> standardQueue;
+    private DoublyLinkedList<Guest> guestRegistry;
+    private DoublyLinkedList<Room> roomInventory;
+    private BinarySearchTree<Reservation> searchTree;
 
-   public void setUndoController(UndoController var1) {
-      this.undoController = var1;
-   }
+    private UndoController undoController;
+    private LoyaltyController loyaltyController;
 
-   public void setLoyaltyController(LoyaltyController var1) {
-      this.loyaltyController = var1;
-   }
+    private static int arrivalCounter = 0; // Tracks arrival order across modules
 
-   public Reservation registerWalkIn(String var1, String var2, String var3, String var4, String var5, String var6, String var7) {
-      Guest var8 = this.findGuestByContactNo(var3);
-      if (var8 == null) {
-         var8 = new Guest(var1, var2, var3, var4);
-         this.guestRegistry.add(var8);
-      }
+    public StandardBookingController(LinkedQueue<Reservation> standardQueue,
+                                     DoublyLinkedList<Guest> guestRegistry,
+                                     DoublyLinkedList<Room> roomInventory,
+                                     BinarySearchTree<Reservation> searchTree) {
+        this.standardQueue = standardQueue;
+        this.guestRegistry = guestRegistry;
+        this.roomInventory = roomInventory;
+        this.searchTree = searchTree;
+    }
 
-      Reservation var9 = new Reservation(var8.getGuestId(), var5, var6, var7);
-      var9.setGuest(var8);
-      var9.setBookingStatus("PENDING");
-      this.standardQueue.enqueue(var9);
-      this.searchTree.insert(var9);
-      if (this.undoController != null) {
-         this.undoController.recordAction("WALK_IN_REGISTRATION", "Module 1: Standard Booking", "Register Walk-In: " + var1 + " (Conf #" + var9.getConfirmationNo() + ")", () -> {
-            var9.setBookingStatus("CANCELLED");
-            this.searchTree.delete(var9);
-         });
-      }
+    public void setUndoController(UndoController undoController) {
+        this.undoController = undoController;
+    }
 
-      return var9;
-   }
+    public void setLoyaltyController(LoyaltyController loyaltyController) {
+        this.loyaltyController = loyaltyController;
+    }
 
-   public Reservation processNextBooking() {
-      if (this.standardQueue.isEmpty()) {
-         return null;
-      } else {
-         Reservation var1 = this.dequeueNextActiveReservation();
-         if (var1 == null) {
+    /**
+     * Registers a walk-in guest and creates a PENDING reservation.
+     * The guest is added to the guest registry and the reservation
+     * is enqueued into the standard FIFO queue.
+     *
+     * @return The created Reservation with a generated confirmation number.
+     */
+    public Reservation registerWalkIn(String name, String icPassport, String contactNo,
+                                       String email, String roomType,
+                                       String checkInDate, String checkOutDate) {
+        // Reuse the existing guest and loyalty identity when the phone is registered.
+        Guest guest = findGuestByContactNo(contactNo);
+        if (guest == null) {
+            guest = new Guest(name, icPassport, contactNo, email);
+            guestRegistry.add(guest);
+        }
+
+        // Create reservation
+        Reservation reservation = new Reservation(guest.getGuestId(), roomType, checkInDate, checkOutDate);
+        reservation.setGuest(guest);
+        reservation.setBookingStatus("PENDING");
+
+        // Enqueue into standard queue (FIFO)
+        standardQueue.enqueue(reservation);
+
+        // Insert into BST for front-desk search
+        searchTree.insert(reservation);
+
+        // Record Undo Action
+        if (undoController != null) {
+            undoController.recordAction(
+                "WALK_IN_REGISTRATION",
+                "Module 1: Standard Booking",
+                "Register Walk-In: " + name + " (Conf #" + reservation.getConfirmationNo() + ")",
+                () -> {
+                    reservation.setBookingStatus("CANCELLED");
+                    searchTree.delete(reservation);
+                }
+            );
+        }
+
+        return reservation;
+    }
+
+    /**
+     * Processes the next booking in the standard queue.
+     * Dequeues the front reservation and attempts to assign an available room.
+     *
+     * @return The processed Reservation with assigned room, or null if queue is empty.
+     */
+    public Reservation processNextBooking() {
+        if (standardQueue.isEmpty()) {
             return null;
-         } else {
-            Room var2 = this.findAvailableRoom(var1.getRoomType());
-            if (var2 != null) {
-               var2.setStatus("OCCUPIED");
-               var1.setAssignedRoomNo(var2.getRoomNo());
-               var1.setBookingStatus("CONFIRMED");
-               this.searchTree.delete(var1);
-               this.searchTree.insert(var1);
-               if (this.undoController != null) {
-                  this.undoController.recordAction("PROCESS_BOOKING", "Module 1: Standard Booking", "Assigned Room " + var2.getRoomNo() + " to Conf #" + var1.getConfirmationNo(), () -> {
-                     var2.setStatus("AVAILABLE");
-                     var1.setAssignedRoomNo((String)null);
-                     var1.setBookingStatus("PENDING");
-                     this.standardQueue.enqueue(var1);
-                     this.searchTree.delete(var1);
-                     this.searchTree.insert(var1);
-                  });
-               }
-            } else {
-               var1.setBookingStatus("PENDING");
-               this.standardQueue.enqueue(var1);
+        }
+
+        Reservation reservation = dequeueNextActiveReservation();
+        if (reservation == null) return null;
+
+        // Find an available room matching the requested type
+        Room assignedRoom = findAvailableRoom(reservation.getRoomType());
+        if (assignedRoom != null) {
+            assignedRoom.setStatus("OCCUPIED");
+            reservation.setAssignedRoomNo(assignedRoom.getRoomNo());
+            reservation.setBookingStatus("CONFIRMED");
+
+            // Update the BST entry
+            searchTree.delete(reservation);
+            searchTree.insert(reservation);
+
+            // Record Undo Action
+            if (undoController != null) {
+                undoController.recordAction(
+                    "PROCESS_BOOKING",
+                    "Module 1: Standard Booking",
+                    "Assigned Room " + assignedRoom.getRoomNo() + " to Conf #" + reservation.getConfirmationNo(),
+                    () -> {
+                        assignedRoom.setStatus("AVAILABLE");
+                        reservation.setAssignedRoomNo(null);
+                        reservation.setBookingStatus("PENDING");
+                        standardQueue.enqueue(reservation);
+                        searchTree.delete(reservation);
+                        searchTree.insert(reservation);
+                    }
+                );
             }
+        } else {
+            // No room available — booking stays PENDING but is dequeued
+            reservation.setBookingStatus("PENDING");
+            standardQueue.enqueue(reservation);
+        }
 
-            return var1;
-         }
-      }
-   }
+        return reservation;
+    }
 
-   public Guest findGuestByContactNo(String var1) {
-      String var2 = this.normalizeContactNo(var1);
-      if (var2.isEmpty()) {
-         return null;
-      } else {
-         for(int var3 = 1; var3 <= this.guestRegistry.getNumberOfEntries(); ++var3) {
-            Guest var4 = (Guest)this.guestRegistry.getEntry(var3);
-            if (var4 != null && var2.equals(this.normalizeContactNo(var4.getContactNo()))) {
-               return var4;
+    /** Finds a registered guest by phone number, ignoring common formatting characters. */
+    public Guest findGuestByContactNo(String contactNo) {
+        String normalizedContact = normalizeContactNo(contactNo);
+        if (normalizedContact.isEmpty()) return null;
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest != null
+                    && normalizedContact.equals(normalizeContactNo(guest.getContactNo()))) {
+                return guest;
             }
-         }
+        }
+        return null;
+    }
 
-         return null;
-      }
-   }
+    /** Returns the loyalty profile tied to a registered phone number. */
+    public LoyaltyAccount findLoyaltyAccountByContactNo(String contactNo) {
+        Guest guest = findGuestByContactNo(contactNo);
+        if (guest == null || loyaltyController == null) return null;
+        return loyaltyController.viewMemberProfile(guest.getGuestId());
+    }
 
-   public LoyaltyAccount findLoyaltyAccountByContactNo(String var1) {
-      Guest var2 = this.findGuestByContactNo(var1);
-      return var2 != null && this.loyaltyController != null ? this.loyaltyController.viewMemberProfile(var2.getGuestId()) : null;
-   }
+    /** Registers a new STANDARD member without creating a room reservation. */
+    public Guest registerNewMember(String name, String icPassport, String contactNo, String email) {
+        Guest existingGuest = findGuestByContactNo(contactNo);
+        if (existingGuest != null) return existingGuest;
 
-   public Guest registerNewMember(String var1, String var2, String var3, String var4) {
-      Guest var5 = this.findGuestByContactNo(var3);
-      if (var5 != null) {
-         return var5;
-      } else {
-         Guest var6 = new Guest(var1, var2, var3, var4);
-         this.guestRegistry.add(var6);
-         if (this.loyaltyController != null) {
-            this.loyaltyController.viewMemberProfile(var6.getGuestId());
-         }
+        Guest guest = new Guest(name, icPassport, contactNo, email);
+        guestRegistry.add(guest);
+        if (loyaltyController != null) {
+            loyaltyController.viewMemberProfile(guest.getGuestId());
+        }
+        return guest;
+    }
 
-         return var6;
-      }
-   }
+    private String normalizeContactNo(String contactNo) {
+        if (contactNo == null) return "";
+        String digits = contactNo.replaceAll("[^0-9]", "");
+        if (digits.startsWith("0060")) digits = digits.substring(2);
+        if (digits.startsWith("60")) digits = "0" + digits.substring(2);
+        return digits;
+    }
 
-   private String normalizeContactNo(String var1) {
-      if (var1 == null) {
-         return "";
-      } else {
-         String var2 = var1.replaceAll("[^0-9]", "");
-         if (var2.startsWith("0060")) {
-            var2 = var2.substring(2);
-         }
+    private Reservation dequeueNextActiveReservation() {
+        Reservation reservation = standardQueue.dequeue();
+        while (reservation != null && !"PENDING".equals(reservation.getBookingStatus())) {
+            reservation = standardQueue.dequeue();
+        }
+        return reservation;
+    }
 
-         if (var2.startsWith("60")) {
-            var2 = "0" + var2.substring(2);
-         }
+    /**
+     * Peeks at the next booking in the queue without removing it.
+     */
+    public Reservation peekNextBooking() {
+        DoublyLinkedList<Reservation> reservations = standardQueue.toList();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null && "PENDING".equals(reservation.getBookingStatus())) {
+                return reservation;
+            }
+        }
+        return null;
+    }
 
-         return var2;
-      }
-   }
+    /**
+     * Returns the current size of the standard queue.
+     */
+    public int getQueueSize() {
+        return getQueueList().getNumberOfEntries();
+    }
 
-   private Reservation dequeueNextActiveReservation() {
-      Reservation var1;
-      for(var1 = (Reservation)this.standardQueue.dequeue(); var1 != null && !"PENDING".equals(var1.getBookingStatus()); var1 = (Reservation)this.standardQueue.dequeue()) {
-      }
+    /**
+     * Returns all reservations currently in the standard queue.
+     */
+    public DoublyLinkedList<Reservation> getQueueList() {
+        DoublyLinkedList<Reservation> pendingReservations = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> allReservations = standardQueue.toList();
+        for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
+            Reservation reservation = allReservations.getEntry(i);
+            if (reservation != null && "PENDING".equals(reservation.getBookingStatus())) {
+                pendingReservations.add(reservation);
+            }
+        }
+        return pendingReservations;
+    }
 
-      return var1;
-   }
+    /**
+     * Checks if the standard queue is empty.
+     */
+    public boolean isQueueEmpty() {
+        return peekNextBooking() == null;
+    }
 
-   public Reservation peekNextBooking() {
-      DoublyLinkedList var1 = this.standardQueue.toList();
+    /**
+     * Finds the first available room matching the requested type.
+     */
+    private Room findAvailableRoom(String roomType) {
+        for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
+            Room room = roomInventory.getEntry(i);
+            if (room.getStatus().equals("AVAILABLE") && room.getRoomType().equals(roomType)) {
+                return room;
+            }
+        }
+        // If no room of exact type, try any available room
+        for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
+            Room room = roomInventory.getEntry(i);
+            if (room.getStatus().equals("AVAILABLE")) {
+                return room;
+            }
+        }
+        return null;
+    }
 
-      for(int var2 = 1; var2 <= var1.getNumberOfEntries(); ++var2) {
-         Reservation var3 = (Reservation)var1.getEntry(var2);
-         if (var3 != null && "PENDING".equals(var3.getBookingStatus())) {
-            return var3;
-         }
-      }
-
-      return null;
-   }
-
-   public int getQueueSize() {
-      return this.getQueueList().getNumberOfEntries();
-   }
-
-   public DoublyLinkedList<Reservation> getQueueList() {
-      DoublyLinkedList var1 = new DoublyLinkedList();
-      DoublyLinkedList var2 = this.standardQueue.toList();
-
-      for(int var3 = 1; var3 <= var2.getNumberOfEntries(); ++var3) {
-         Reservation var4 = (Reservation)var2.getEntry(var3);
-         if (var4 != null && "PENDING".equals(var4.getBookingStatus())) {
-            var1.add(var4);
-         }
-      }
-
-      return var1;
-   }
-
-   public boolean isQueueEmpty() {
-      return this.peekNextBooking() == null;
-   }
-
-   private Room findAvailableRoom(String var1) {
-      for(int var2 = 1; var2 <= this.roomInventory.getNumberOfEntries(); ++var2) {
-         Room var3 = (Room)this.roomInventory.getEntry(var2);
-         if (var3.getStatus().equals("AVAILABLE") && var3.getRoomType().equals(var1)) {
-            return var3;
-         }
-      }
-
-      for(int var4 = 1; var4 <= this.roomInventory.getNumberOfEntries(); ++var4) {
-         Room var5 = (Room)this.roomInventory.getEntry(var4);
-         if (var5.getStatus().equals("AVAILABLE")) {
-            return var5;
-         }
-      }
-
-      return null;
-   }
-
-   public static int getNextArrivalIndex() {
-      return arrivalCounter++;
-   }
+    /**
+     * Gets the global arrival counter (shared across modules for priority calculation).
+     */
+    public static int getNextArrivalIndex() {
+        return arrivalCounter++;
+    }
 }

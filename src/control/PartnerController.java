@@ -1,4 +1,3 @@
-// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
 package control;
 
 import adt.DoublyLinkedList;
@@ -7,159 +6,214 @@ import entity.CustomerReferral;
 import entity.Guest;
 import entity.Partner;
 
+/**
+ * Controller: PartnerController — Manages business logic for Module 5 (Strategic Partners & Referrals).
+ * Coordinates strategic partner profiles, customer referrals, product introductions based on customer stage,
+ * and management reporting using MergeSort and QuickSort.
+ */
 public class PartnerController {
-   private DoublyLinkedList<Partner> partnerRegistry;
-   private DoublyLinkedList<CustomerReferral> referralLog;
-   private DoublyLinkedList<Guest> guestRegistry;
-   private UndoController undoController;
 
-   public PartnerController(DoublyLinkedList<Partner> var1, DoublyLinkedList<CustomerReferral> var2, DoublyLinkedList<Guest> var3) {
-      this.partnerRegistry = var1;
-      this.referralLog = var2;
-      this.guestRegistry = var3;
-   }
+    private DoublyLinkedList<Partner> partnerRegistry;
+    private DoublyLinkedList<CustomerReferral> referralLog;
+    private DoublyLinkedList<Guest> guestRegistry;
+    private UndoController undoController;
 
-   public void setUndoController(UndoController var1) {
-      this.undoController = var1;
-   }
+    public PartnerController(DoublyLinkedList<Partner> partnerRegistry,
+                             DoublyLinkedList<CustomerReferral> referralLog,
+                             DoublyLinkedList<Guest> guestRegistry) {
+        this.partnerRegistry = partnerRegistry;
+        this.referralLog = referralLog;
+        this.guestRegistry = guestRegistry;
+    }
 
-   public Partner registerPartner(String var1, String var2, String var3, String var4, String var5, String var6) {
-      Partner var7 = new Partner(var1, var2.toUpperCase(), var3, var4, var5, var6);
-      this.partnerRegistry.add(var7);
-      if (this.undoController != null) {
-         this.undoController.recordAction("REGISTER_PARTNER", "Module 5: Strategic Partners", "Registered Strategic Partner: " + var1 + " (" + var2 + ")", () -> {
-            for(int var2 = 1; var2 <= this.partnerRegistry.getNumberOfEntries(); ++var2) {
-               if (((Partner)this.partnerRegistry.getEntry(var2)).equals(var7)) {
-                  this.partnerRegistry.remove(var2);
-                  break;
-               }
+    public void setUndoController(UndoController undoController) {
+        this.undoController = undoController;
+    }
+
+    /**
+     * Registers a new strategic partner (Property Developer, Contractor, or Interior Design Firm).
+     */
+    public Partner registerPartner(String companyName, String category, String contactPerson,
+                                   String contactPhone, String email, String offeredServices) {
+        Partner partner = new Partner(companyName, category.toUpperCase(), contactPerson, contactPhone, email, offeredServices);
+        partnerRegistry.add(partner);
+
+        if (undoController != null) {
+            undoController.recordAction(
+                "REGISTER_PARTNER",
+                "Module 5: Strategic Partners",
+                "Registered Strategic Partner: " + companyName + " (" + category + ")",
+                () -> {
+                    for (int i = 1; i <= partnerRegistry.getNumberOfEntries(); i++) {
+                        if (partnerRegistry.getEntry(i).equals(partner)) {
+                            partnerRegistry.remove(i);
+                            break;
+                        }
+                    }
+                }
+            );
+        }
+
+        return partner;
+    }
+
+    /**
+     * Finds a partner by partnerId (e.g. P1001).
+     */
+    public Partner findPartnerById(String partnerId) {
+        for (int i = 1; i <= partnerRegistry.getNumberOfEntries(); i++) {
+            Partner p = partnerRegistry.getEntry(i);
+            if (p != null && p.getPartnerId().equalsIgnoreCase(partnerId)) {
+                return p;
             }
+        }
+        return null;
+    }
 
-         });
-      }
+    /**
+     * Returns all registered partners.
+     */
+    public DoublyLinkedList<Partner> getAllPartners() {
+        return partnerRegistry;
+    }
 
-      return var7;
-   }
-
-   public Partner findPartnerById(String var1) {
-      for(int var2 = 1; var2 <= this.partnerRegistry.getNumberOfEntries(); ++var2) {
-         Partner var3 = (Partner)this.partnerRegistry.getEntry(var2);
-         if (var3 != null && var3.getPartnerId().equalsIgnoreCase(var1)) {
-            return var3;
-         }
-      }
-
-      return null;
-   }
-
-   public DoublyLinkedList<Partner> getAllPartners() {
-      return this.partnerRegistry;
-   }
-
-   public DoublyLinkedList<Partner> getPartnersByCategory(String var1) {
-      DoublyLinkedList var2 = new DoublyLinkedList();
-
-      for(int var3 = 1; var3 <= this.partnerRegistry.getNumberOfEntries(); ++var3) {
-         Partner var4 = (Partner)this.partnerRegistry.getEntry(var3);
-         if (var4 != null && var4.getPartnerCategory().equalsIgnoreCase(var1)) {
-            var2.add(var4);
-         }
-      }
-
-      return var2;
-   }
-
-   public CustomerReferral recordReferral(String var1, String var2, String var3, String var4, String var5, double var6, String var8) {
-      Partner var9 = this.findPartnerById(var1);
-      if (var9 == null) {
-         return null;
-      } else {
-         if (var2 != null && !var2.trim().isEmpty() && (var3 == null || var3.trim().isEmpty())) {
-            Guest var10 = this.findGuestById(var2);
-            if (var10 != null) {
-               var3 = var10.getName();
+    /**
+     * Returns partners filtered by category (PROPERTY_DEVELOPER, RENOVATION_CONTRACTOR, ELECTRICAL_CONTRACTOR, INTERIOR_DESIGN_FIRM).
+     */
+    public DoublyLinkedList<Partner> getPartnersByCategory(String category) {
+        DoublyLinkedList<Partner> filtered = new DoublyLinkedList<>();
+        for (int i = 1; i <= partnerRegistry.getNumberOfEntries(); i++) {
+            Partner p = partnerRegistry.getEntry(i);
+            if (p != null && p.getPartnerCategory().equalsIgnoreCase(category)) {
+                filtered.add(p);
             }
-         }
+        }
+        return filtered;
+    }
 
-         CustomerReferral var11 = new CustomerReferral(var1, var2, var3, var4.toUpperCase(), var5, var6, var8);
-         this.referralLog.add(var11);
-         var9.incrementReferrals(var6);
-         if (this.undoController != null) {
-            this.undoController.recordAction("RECORD_REFERRAL", "Module 5: Strategic Partners", "Logged Referral for " + var9.getCompanyName() + ": " + var5 + " ($" + String.format("%.2f", var6) + ")", () -> {
-               for(int var5 = 1; var5 <= this.referralLog.getNumberOfEntries(); ++var5) {
-                  if (((CustomerReferral)this.referralLog.getEntry(var5)).equals(var11)) {
-                     this.referralLog.remove(var5);
-                     break;
-                  }
-               }
+    /**
+     * Records a new customer product/service referral introduced by a partner.
+     * Updates the partner's referral count and total revenue generated.
+     */
+    public CustomerReferral recordReferral(String partnerId, String guestId, String customerName,
+                                          String customerStage, String productIntroduced,
+                                          double dealAmount, String referralDate) {
+        Partner partner = findPartnerById(partnerId);
+        if (partner == null) {
+            return null;
+        }
 
-               var9.setTotalReferralsCount(var9.getTotalReferralsCount() - 1);
-               var9.setTotalRevenueGenerated(var9.getTotalRevenueGenerated() - var6);
-            });
-         }
-
-         return var11;
-      }
-   }
-
-   public DoublyLinkedList<CustomerReferral> getAllReferrals() {
-      return this.referralLog;
-   }
-
-   public DoublyLinkedList<CustomerReferral> getReferralsByPartner(String var1) {
-      DoublyLinkedList var2 = new DoublyLinkedList();
-
-      for(int var3 = 1; var3 <= this.referralLog.getNumberOfEntries(); ++var3) {
-         CustomerReferral var4 = (CustomerReferral)this.referralLog.getEntry(var3);
-         if (var4 != null && var4.getPartnerId().equalsIgnoreCase(var1)) {
-            var2.add(var4);
-         }
-      }
-
-      return var2;
-   }
-
-   public DoublyLinkedList<Partner> getRecommendedPartnersForStage(String var1) {
-      DoublyLinkedList var2 = new DoublyLinkedList();
-      String var3 = var1.toUpperCase().trim();
-
-      for(int var4 = 1; var4 <= this.partnerRegistry.getNumberOfEntries(); ++var4) {
-         Partner var5 = (Partner)this.partnerRegistry.getEntry(var4);
-         if (var5 != null) {
-            String var6 = var5.getPartnerCategory();
-            if ("PURCHASING".equals(var3)) {
-               if ("PROPERTY_DEVELOPER".equals(var6)) {
-                  var2.add(var5);
-               }
-            } else if ("RENOVATING".equals(var3)) {
-               if ("RENOVATION_CONTRACTOR".equals(var6) || "ELECTRICAL_CONTRACTOR".equals(var6)) {
-                  var2.add(var5);
-               }
-            } else if ("UPGRADING".equals(var3) && ("INTERIOR_DESIGN_FIRM".equals(var6) || "RENOVATION_CONTRACTOR".equals(var6))) {
-               var2.add(var5);
+        // Auto-fetch guest name if guestId provided and customerName is empty
+        if (guestId != null && !guestId.trim().isEmpty() && (customerName == null || customerName.trim().isEmpty())) {
+            Guest guest = findGuestById(guestId);
+            if (guest != null) {
+                customerName = guest.getName();
             }
-         }
-      }
+        }
 
-      return var2;
-   }
+        CustomerReferral referral = new CustomerReferral(partnerId, guestId, customerName,
+                customerStage.toUpperCase(), productIntroduced, dealAmount, referralDate);
 
-   public DoublyLinkedList<Partner> getTopPartnersReportByReferrals() {
-      return SortAlgorithms.mergeSort(this.partnerRegistry, (var0, var1) -> Integer.compare(var1.getTotalReferralsCount(), var0.getTotalReferralsCount()));
-   }
+        referralLog.add(referral);
+        partner.incrementReferrals(dealAmount);
 
-   public DoublyLinkedList<Partner> getTopPartnersReportByRevenue() {
-      return SortAlgorithms.quickSort(this.partnerRegistry, (var0, var1) -> Double.compare(var1.getTotalRevenueGenerated(), var0.getTotalRevenueGenerated()));
-   }
+        if (undoController != null) {
+            undoController.recordAction(
+                "RECORD_REFERRAL",
+                "Module 5: Strategic Partners",
+                "Logged Referral for " + partner.getCompanyName() + ": " + productIntroduced + " ($" + String.format("%.2f", dealAmount) + ")",
+                () -> {
+                    for (int i = 1; i <= referralLog.getNumberOfEntries(); i++) {
+                        if (referralLog.getEntry(i).equals(referral)) {
+                            referralLog.remove(i);
+                            break;
+                        }
+                    }
+                    partner.setTotalReferralsCount(partner.getTotalReferralsCount() - 1);
+                    partner.setTotalRevenueGenerated(partner.getTotalRevenueGenerated() - dealAmount);
+                }
+            );
+        }
 
-   private Guest findGuestById(String var1) {
-      for(int var2 = 1; var2 <= this.guestRegistry.getNumberOfEntries(); ++var2) {
-         Guest var3 = (Guest)this.guestRegistry.getEntry(var2);
-         if (var3 != null && var3.getGuestId().equalsIgnoreCase(var1)) {
-            return var3;
-         }
-      }
+        return referral;
+    }
 
-      return null;
-   }
+    /**
+     * Returns all recorded customer referrals.
+     */
+    public DoublyLinkedList<CustomerReferral> getAllReferrals() {
+        return referralLog;
+    }
+
+    /**
+     * Returns referrals for a specific partner.
+     */
+    public DoublyLinkedList<CustomerReferral> getReferralsByPartner(String partnerId) {
+        DoublyLinkedList<CustomerReferral> list = new DoublyLinkedList<>();
+        for (int i = 1; i <= referralLog.getNumberOfEntries(); i++) {
+            CustomerReferral ref = referralLog.getEntry(i);
+            if (ref != null && ref.getPartnerId().equalsIgnoreCase(partnerId)) {
+                list.add(ref);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Recommends strategic partners according to the customer's active stage:
+     * - PURCHASING -> Property Developers (Sime Darby Property, SP Setia, Sunway Property)
+     * - RENOVATING -> Renovation & Electrical Contractors
+     * - UPGRADING  -> Interior Design Firms & Renovation Contractors
+     */
+    public DoublyLinkedList<Partner> getRecommendedPartnersForStage(String stage) {
+        DoublyLinkedList<Partner> recommended = new DoublyLinkedList<>();
+        String normalizedStage = stage.toUpperCase().trim();
+
+        for (int i = 1; i <= partnerRegistry.getNumberOfEntries(); i++) {
+            Partner p = partnerRegistry.getEntry(i);
+            if (p == null) continue;
+
+            String cat = p.getPartnerCategory();
+            if ("PURCHASING".equals(normalizedStage)) {
+                if ("PROPERTY_DEVELOPER".equals(cat)) {
+                    recommended.add(p);
+                }
+            } else if ("RENOVATING".equals(normalizedStage)) {
+                if ("RENOVATION_CONTRACTOR".equals(cat) || "ELECTRICAL_CONTRACTOR".equals(cat)) {
+                    recommended.add(p);
+                }
+            } else if ("UPGRADING".equals(normalizedStage)) {
+                if ("INTERIOR_DESIGN_FIRM".equals(cat) || "RENOVATION_CONTRACTOR".equals(cat)) {
+                    recommended.add(p);
+                }
+            }
+        }
+        return recommended;
+    }
+
+    /**
+     * Management Report: Top Strategic Partners ranked by total referrals count using MergeSort (descending).
+     */
+    public DoublyLinkedList<Partner> getTopPartnersReportByReferrals() {
+        return SortAlgorithms.mergeSort(partnerRegistry, (p1, p2) ->
+                Integer.compare(p2.getTotalReferralsCount(), p1.getTotalReferralsCount()));
+    }
+
+    /**
+     * Management Report: Strategic Partners ranked by total revenue generated using QuickSort (descending).
+     */
+    public DoublyLinkedList<Partner> getTopPartnersReportByRevenue() {
+        return SortAlgorithms.quickSort(partnerRegistry, (p1, p2) ->
+                Double.compare(p2.getTotalRevenueGenerated(), p1.getTotalRevenueGenerated()));
+    }
+
+    private Guest findGuestById(String guestId) {
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest g = guestRegistry.getEntry(i);
+            if (g != null && g.getGuestId().equalsIgnoreCase(guestId)) {
+                return g;
+            }
+        }
+        return null;
+    }
 }

@@ -1,4 +1,3 @@
-// Source code is decompiled from a .class file using FernFlower decompiler (from Intellij IDEA).
 package boundary;
 
 import adt.DoublyLinkedList;
@@ -7,167 +6,176 @@ import entity.UndoAction;
 import java.util.Scanner;
 import utility.UIUtils;
 
+/**
+ * Boundary: Undo Control Center UI.
+ * Provides the interactive boundary interface for viewing, peeking, and
+ * executing transaction reversals via the CustomQueue<UndoAction> (Queue ADT).
+ */
 public class UndoUI {
-   private UndoController controller;
-   private Scanner scanner;
 
-   public UndoUI(UndoController var1, Scanner var2) {
-      this.controller = var1;
-      this.scanner = var2;
-   }
+    private UndoController controller;
+    private Scanner scanner;
 
-   public void show() {
-      boolean var1 = false;
+    public UndoUI(UndoController controller, Scanner scanner) {
+        this.controller = controller;
+        this.scanner = scanner;
+    }
 
-      do {
-         UIUtils.clearScreen();
-         this.printUndoHeader();
-         this.displayMenu();
-         int var2 = UIUtils.safeReadInt(this.scanner);
-         switch (var2) {
-            case 0:
-               var1 = true;
-               break;
-            case 1:
-               this.processNextUndo();
-               var1 = UIUtils.promptPostOperationNavigation(this.scanner);
-               break;
-            case 2:
-               this.peekNextUndo();
-               var1 = UIUtils.promptPostOperationNavigation(this.scanner);
-               break;
-            case 3:
-               this.viewUndoQueue();
-               var1 = UIUtils.promptPostOperationNavigation(this.scanner);
-               break;
-            case 4:
-               this.clearQueue();
-               var1 = UIUtils.promptPostOperationNavigation(this.scanner);
-               break;
-            default:
-               System.out.println("\u001b[91mInvalid option. Please try again.\u001b[0m");
-               UIUtils.pressEnterToContinue(this.scanner);
-         }
-      } while(!var1);
+    public void show() {
+        boolean exitToMainMenu = false;
+        do {
+            UIUtils.clearScreen();
+            printUndoHeader();
+            displayMenu();
+            int choice = UIUtils.safeReadInt(scanner);
 
-   }
-
-   private void printUndoHeader() {
-      System.out.println("\u001b[95m\u001b[1m=====================================================================\u001b[0m");
-      System.out.println("\u001b[95m\u001b[1m    CENTRAL TRANSACTION UNDO UTILITY  [ STACK ADT - LIFO ]\u001b[0m");
-      System.out.println("\u001b[97m    Cross-Module System Utility — Reverses Most Recent Action First\u001b[0m");
-      System.out.println("\u001b[95m\u001b[1m=====================================================================\u001b[0m");
-      System.out.println("  \u001b[93mPending Reversible Actions on Stack: " + this.controller.getQueueSize() + "\u001b[0m");
-      System.out.println();
-   }
-
-   private void displayMenu() {
-      UIUtils.printSectionHeader("STACK UNDO REVERSAL CONTROLS", "\u001b[95m");
-      System.out.println("  \u001b[95m\u001b[1m1.\u001b[0m Process Most Recent Undo (Pop & Execute Reversal)");
-      System.out.println("  \u001b[95m\u001b[1m2.\u001b[0m Peek Top Action on Undo Stack");
-      UIUtils.printSectionHeader("STACK AUDIT & MANAGEMENT", "\u001b[95m");
-      System.out.println("  \u001b[95m\u001b[1m3.\u001b[0m View Entire Undo Stack");
-      System.out.println("  \u001b[95m\u001b[1m4.\u001b[0m Clear Undo Stack History");
-      UIUtils.printSectionHeader("NAVIGATION", "\u001b[91m");
-      System.out.println("  \u001b[91m\u001b[1m0.\u001b[0m Back to Main Menu");
-      System.out.println("──────────────────────────────────────────────────────────");
-      System.out.print("\u001b[1mEnter your choice: \u001b[0m");
-   }
-
-   private void processNextUndo() {
-      UIUtils.printSubHeader("SYSTEM UTILITY > PROCESS MOST RECENT UNDO (POP)", "\u001b[95m");
-      if (this.controller.isQueueEmpty()) {
-         System.out.println("\u001b[93mThe Undo Stack is currently EMPTY. No actions available to undo.\u001b[0m");
-      } else {
-         UndoAction var1 = this.controller.peekNextUndo();
-         System.out.println("Most recent action to reverse (Top of Stack):");
-         System.out.println("  ID          : " + var1.getActionId());
-         System.out.println("  Module      : " + var1.getModuleName());
-         System.out.println("  Description : " + var1.getDescription());
-         System.out.println("  Logged At   : " + var1.getTimestamp());
-         System.out.print("\nConfirm execution of undo reversal? (Y/N): ");
-         String var2 = UIUtils.safeReadLine(this.scanner).toUpperCase();
-         if ("Y".equals(var2)) {
-            UndoAction var3 = this.controller.processNextUndo();
-            if (var3 != null) {
-               System.out.println("\n\u001b[92m\u001b[1m+------------------------------------------+\u001b[0m");
-               System.out.println("\u001b[92m\u001b[1m  TRANSACTION UNDONE SUCCESSFULLY!\u001b[0m");
-               System.out.println("\u001b[92m\u001b[1m+------------------------------------------+\u001b[0m");
-               System.out.println("  Action ID   : " + var3.getActionId());
-               System.out.println("  Module      : " + var3.getModuleName());
-               System.out.println("  Reverted    : " + var3.getDescription());
-               System.out.println("  Remaining on Stack: " + this.controller.getQueueSize());
-               System.out.println("+------------------------------------------+");
-            } else {
-               System.out.println("\u001b[91mFailed to execute undo.\u001b[0m");
+            switch (choice) {
+                case 1:
+                    processNextUndo();
+                    exitToMainMenu = UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 2:
+                    peekNextUndo();
+                    exitToMainMenu = UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 3:
+                    viewUndoQueue();
+                    exitToMainMenu = UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 4:
+                    clearQueue();
+                    exitToMainMenu = UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 0:
+                    exitToMainMenu = true;
+                    break;
+                default:
+                    System.out.println(UIUtils.RED + "Invalid option. Please try again." + UIUtils.RESET);
+                    UIUtils.pressEnterToContinue(scanner);
             }
-         } else {
+        } while (!exitToMainMenu);
+    }
+
+    private void printUndoHeader() {
+        System.out.println(UIUtils.PURPLE + UIUtils.BOLD + "=====================================================================" + UIUtils.RESET);
+        System.out.println(UIUtils.PURPLE + UIUtils.BOLD + "    CENTRAL TRANSACTION UNDO UTILITY  [ STACK ADT - LIFO ]" + UIUtils.RESET);
+        System.out.println(UIUtils.WHITE + "    Cross-Module System Utility — Reverses Most Recent Action First" + UIUtils.RESET);
+        System.out.println(UIUtils.PURPLE + UIUtils.BOLD + "=====================================================================" + UIUtils.RESET);
+        System.out.println("  " + UIUtils.YELLOW + "Pending Reversible Actions on Stack: " + controller.getQueueSize() + UIUtils.RESET);
+        System.out.println();
+    }
+
+    private void displayMenu() {
+        UIUtils.printSectionHeader("STACK UNDO REVERSAL CONTROLS", UIUtils.PURPLE);
+        System.out.println("  " + UIUtils.PURPLE + UIUtils.BOLD + "1." + UIUtils.RESET + " Process Most Recent Undo (Pop & Execute Reversal)");
+        System.out.println("  " + UIUtils.PURPLE + UIUtils.BOLD + "2." + UIUtils.RESET + " Peek Top Action on Undo Stack");
+
+        UIUtils.printSectionHeader("STACK AUDIT & MANAGEMENT", UIUtils.PURPLE);
+        System.out.println("  " + UIUtils.PURPLE + UIUtils.BOLD + "3." + UIUtils.RESET + " View Entire Undo Stack");
+        System.out.println("  " + UIUtils.PURPLE + UIUtils.BOLD + "4." + UIUtils.RESET + " Clear Undo Stack History");
+
+        UIUtils.printSectionHeader("NAVIGATION", UIUtils.RED);
+        System.out.println("  " + UIUtils.RED + UIUtils.BOLD + "0." + UIUtils.RESET + " Back to Main Menu");
+        System.out.println("──────────────────────────────────────────────────────────");
+        System.out.print(UIUtils.BOLD + "Enter your choice: " + UIUtils.RESET);
+    }
+
+    private void processNextUndo() {
+        UIUtils.printSubHeader("SYSTEM UTILITY > PROCESS MOST RECENT UNDO (POP)", UIUtils.PURPLE);
+
+        if (controller.isQueueEmpty()) {
+            System.out.println(UIUtils.YELLOW + "The Undo Stack is currently EMPTY. No actions available to undo." + UIUtils.RESET);
+            return;
+        }
+
+        UndoAction peekAction = controller.peekNextUndo();
+        System.out.println("Most recent action to reverse (Top of Stack):");
+        System.out.println("  ID          : " + peekAction.getActionId());
+        System.out.println("  Module      : " + peekAction.getModuleName());
+        System.out.println("  Description : " + peekAction.getDescription());
+        System.out.println("  Logged At   : " + peekAction.getTimestamp());
+
+        System.out.print("\nConfirm execution of undo reversal? (Y/N): ");
+        String confirm = UIUtils.safeReadLine(scanner).toUpperCase();
+
+        if ("Y".equals(confirm)) {
+            UndoAction undone = controller.processNextUndo();
+            if (undone != null) {
+                System.out.println("\n" + UIUtils.GREEN + UIUtils.BOLD + "+------------------------------------------+" + UIUtils.RESET);
+                System.out.println(UIUtils.GREEN + UIUtils.BOLD + "  TRANSACTION UNDONE SUCCESSFULLY!" + UIUtils.RESET);
+                System.out.println(UIUtils.GREEN + UIUtils.BOLD + "+------------------------------------------+" + UIUtils.RESET);
+                System.out.println("  Action ID   : " + undone.getActionId());
+                System.out.println("  Module      : " + undone.getModuleName());
+                System.out.println("  Reverted    : " + undone.getDescription());
+                System.out.println("  Remaining on Stack: " + controller.getQueueSize());
+                System.out.println("+------------------------------------------+");
+            } else {
+                System.out.println(UIUtils.RED + "Failed to execute undo." + UIUtils.RESET);
+            }
+        } else {
             System.out.println("Undo operation cancelled.");
-         }
+        }
+    }
 
-      }
-   }
+    private void peekNextUndo() {
+        UIUtils.printSubHeader("SYSTEM UTILITY > PEEK TOP STACK UNDO", UIUtils.PURPLE);
 
-   private void peekNextUndo() {
-      UIUtils.printSubHeader("SYSTEM UTILITY > PEEK TOP STACK UNDO", "\u001b[95m");
-      UndoAction var1 = this.controller.peekNextUndo();
-      if (var1 == null) {
-         System.out.println("\u001b[93mThe Undo Stack is currently EMPTY.\u001b[0m");
-      } else {
-         System.out.println("  Top Action on Stack:");
-         System.out.println("  Action ID   : " + var1.getActionId());
-         System.out.println("  Module      : " + var1.getModuleName());
-         System.out.println("  Description : " + var1.getDescription());
-         System.out.println("  Timestamp   : " + var1.getTimestamp());
-      }
+        UndoAction action = controller.peekNextUndo();
+        if (action == null) {
+            System.out.println(UIUtils.YELLOW + "The Undo Stack is currently EMPTY." + UIUtils.RESET);
+        } else {
+            System.out.println("  Top Action on Stack:");
+            System.out.println("  Action ID   : " + action.getActionId());
+            System.out.println("  Module      : " + action.getModuleName());
+            System.out.println("  Description : " + action.getDescription());
+            System.out.println("  Timestamp   : " + action.getTimestamp());
+        }
+    }
 
-   }
+    private void viewUndoQueue() {
+        UIUtils.printSubHeader("SYSTEM UTILITY > VIEW UNDO STACK HISTORY", UIUtils.PURPLE);
+        System.out.println("Stack Size: " + controller.getQueueSize());
 
-   private void viewUndoQueue() {
-      UIUtils.printSubHeader("SYSTEM UTILITY > VIEW UNDO STACK HISTORY", "\u001b[95m");
-      System.out.println("Stack Size: " + this.controller.getQueueSize());
-      if (this.controller.isQueueEmpty()) {
-         System.out.println("\u001b[93mThe Undo Stack is empty.\u001b[0m");
-      } else {
-         DoublyLinkedList var1 = this.controller.getUndoQueueList();
-         System.out.println("+-----+----------+----------+-----------------------------+----------------------------------------------+");
-         System.out.println("| Pos | ID       | Time     | Originating Module          | Description                                  |");
-         System.out.println("+-----+----------+----------+-----------------------------+----------------------------------------------+");
+        if (controller.isQueueEmpty()) {
+            System.out.println(UIUtils.YELLOW + "The Undo Stack is empty." + UIUtils.RESET);
+            return;
+        }
 
-         for(int var2 = 1; var2 <= var1.getNumberOfEntries(); ++var2) {
-            UndoAction var3 = (UndoAction)var1.getEntry(var2);
-            System.out.printf("| %-3d | %-8s | %-8s | %-27s | %-44s |%n", var2, var3.getActionId(), var3.getTimestamp(), this.truncate(var3.getModuleName(), 27), this.truncate(var3.getDescription(), 44));
-         }
+        DoublyLinkedList<UndoAction> list = controller.getUndoQueueList();
+        System.out.println("+-----+----------+----------+-----------------------------+----------------------------------------------+");
+        System.out.println("| Pos | ID       | Time     | Originating Module          | Description                                  |");
+        System.out.println("+-----+----------+----------+-----------------------------+----------------------------------------------+");
 
-         System.out.println("+-----+----------+----------+-----------------------------+----------------------------------------------+");
-      }
-   }
+        for (int i = 1; i <= list.getNumberOfEntries(); i++) {
+            UndoAction action = list.getEntry(i);
+            System.out.printf("| %-3d | %-8s | %-8s | %-27s | %-44s |%n",
+                    i, action.getActionId(), action.getTimestamp(),
+                    truncate(action.getModuleName(), 27),
+                    truncate(action.getDescription(), 44));
+        }
+        System.out.println("+-----+----------+----------+-----------------------------+----------------------------------------------+");
+    }
 
-   private void clearQueue() {
-      UIUtils.printSubHeader("SYSTEM UTILITY > CLEAR UNDO STACK", "\u001b[95m");
-      if (this.controller.isQueueEmpty()) {
-         System.out.println("The stack is already empty.");
-      } else {
-         System.out.print("Are you sure you want to clear all " + this.controller.getQueueSize() + " pending undo actions on the stack? (Y/N): ");
-         String var1 = UIUtils.safeReadLine(this.scanner).toUpperCase();
-         if ("Y".equals(var1)) {
-            this.controller.clearUndoQueue();
-            System.out.println("\u001b[92mUndo Stack cleared successfully.\u001b[0m");
-         } else {
+    private void clearQueue() {
+        UIUtils.printSubHeader("SYSTEM UTILITY > CLEAR UNDO STACK", UIUtils.PURPLE);
+        if (controller.isQueueEmpty()) {
+            System.out.println("The stack is already empty.");
+            return;
+        }
+
+        System.out.print("Are you sure you want to clear all " + controller.getQueueSize() + " pending undo actions on the stack? (Y/N): ");
+        String confirm = UIUtils.safeReadLine(scanner).toUpperCase();
+        if ("Y".equals(confirm)) {
+            controller.clearUndoQueue();
+            System.out.println(UIUtils.GREEN + "Undo Stack cleared successfully." + UIUtils.RESET);
+        } else {
             System.out.println("Action cancelled.");
-         }
+        }
+    }
 
-      }
-   }
-
-   private String truncate(String var1, int var2) {
-      if (var1 == null) {
-         return "";
-      } else if (var1.length() <= var2) {
-         return var1;
-      } else {
-         String var10000 = var1.substring(0, var2 - 3);
-         return var10000 + "...";
-      }
-   }
+    private String truncate(String text, int maxLength) {
+        if (text == null) return "";
+        if (text.length() <= maxLength) return text;
+        return text.substring(0, maxLength - 3) + "...";
+    }
 }

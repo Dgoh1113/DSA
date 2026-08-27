@@ -51,7 +51,6 @@ public class Main {
         DoublyLinkedList<FrontDeskLog> cancellationLog          = new DoublyLinkedList<>();
         DoublyLinkedList<BillingRecord> billingLog              = new DoublyLinkedList<>();
 
-
         // ============================
         // Check & Load Persisted Text Files into ADTs
         // ============================
