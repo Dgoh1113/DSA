@@ -55,6 +55,10 @@ public class FrontDeskUI {
                     viewRoomStatus();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
+                case 7:
+                    queryBillingDetails();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
                 case 0:
                     exitToMainMenu = true;
                     break;
@@ -75,6 +79,9 @@ public class FrontDeskUI {
         utility.UIUtils.printSectionHeader("SYSTEM RECORDS & INVENTORY", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " View All Reservations (BST In-Order Sorted)");
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Availability Status");
+
+        utility.UIUtils.printSectionHeader("BILLING QUERY", utility.UIUtils.GREEN);
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Query Billing Details (8-Digit Confirmation No)");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -193,11 +200,13 @@ public class FrontDeskUI {
         if ("Y".equals(confirm)) {
             Reservation checkedOut = controller.checkOut(confirmNo);
             if (checkedOut != null) {
-                int nights = controller.calculateNights(checkedOut.getCheckInDate(), checkedOut.getCheckOutDate());
                 System.out.println("\n*** CHECK-OUT SUCCESSFUL ***");
                 System.out.println("Room " + checkedOut.getAssignedRoomNo() + " is now AVAILABLE.");
-                System.out.println("Stay duration: " + nights + (nights == 1 ? " night." : " nights."));
                 System.out.println("Loyalty points accrued to Guest ID: " + checkedOut.getGuestId());
+                FrontDeskController.BillingDetails bill = controller.queryBillingDetails(confirmNo);
+                if (bill != null) {
+                    displayBillingDetails(bill);
+                }
             } else {
                 System.out.println("Check-out failed.");
             }
@@ -292,6 +301,62 @@ public class FrontDeskUI {
         System.out.println("+--------+-----------+---------------+-------------+");
         System.out.printf("Summary: %d Available | %d Occupied | %d Maintenance%n",
                 available, occupied, maintenance);
+    }
+
+    private void queryBillingDetails() {
+        utility.UIUtils.printSubHeader("MODULE 3 > QUERY BILLING DETAILS", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+        if (reservations.isEmpty()) {
+            System.out.println("No reservations are currently available to query.");
+            return;
+        }
+        displayReservationChoices("ALL RESERVATIONS", reservations, true);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
+
+        FrontDeskController.BillingDetails bill = controller.queryBillingDetails(confirmNo);
+        if (bill == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+        displayBillingDetails(bill);
+    }
+
+    private void displayBillingDetails(FrontDeskController.BillingDetails bill) {
+        System.out.println("\n+----------------------------------------------------+");
+        System.out.println("                   BILLING DETAILS");
+        System.out.println("+----------------------------------------------------+");
+        System.out.println("  Confirmation No : " + bill.getConfirmationNo());
+        System.out.println("  Bill Status     : " + bill.getBillStatus());
+        System.out.println("  Booking Status  : " + bill.getBookingStatus());
+        System.out.println("+----------------------------------------------------+");
+        System.out.println("  Guest ID        : " + bill.getGuestId());
+        System.out.println("  Guest Name      : " + bill.getGuestName());
+        System.out.println("  Loyalty Tier    : " + bill.getLoyaltyTier());
+        System.out.println("+----------------------------------------------------+");
+        System.out.println("  Room Number     : " + bill.getRoomNo());
+        System.out.println("  Room Type       : " + bill.getRoomType());
+        System.out.println("  Check-In Date   : " + bill.getCheckInDate());
+        System.out.println("  Check-Out Date  : " + bill.getCheckOutDate());
+        System.out.println("  Stay Duration   : " + bill.getNights()
+                + (bill.getNights() == 1 ? " night" : " nights"));
+        System.out.println("+----------------------------------------------------+");
+        System.out.printf("  Nightly Rate    : $%.2f%n", bill.getNightlyRate());
+        System.out.printf("  Room Charges    : $%.2f  (%d x $%.2f)%n",
+                bill.getRoomCharges(), bill.getNights(), bill.getNightlyRate());
+        System.out.printf("  Loyalty Discount: -$%.2f  (%.0f%% %s)%n",
+                bill.getDiscountAmount(), bill.getDiscountRate() * 100, bill.getLoyaltyTier());
+        System.out.printf("  SST (%.0f%%)        : $%.2f%n", bill.getTaxRate() * 100, bill.getTaxAmount());
+        System.out.println("+----------------------------------------------------+");
+        System.out.printf("  GRAND TOTAL     : $%.2f%n", bill.getGrandTotal());
+        if ("VOID".equals(bill.getBillStatus())) {
+            System.out.println("  Note            : Cancelled booking — no payment due.");
+        } else if ("ESTIMATE".equals(bill.getBillStatus())) {
+            System.out.println("  Note            : Estimate until the guest checks out.");
+        }
+        System.out.println("+----------------------------------------------------+");
     }
 
     private void displayReservationDetails(Reservation res) {
