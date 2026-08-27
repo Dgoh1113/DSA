@@ -7,7 +7,7 @@ package entity;
  * Primary Key: confirmationNo (8-digit, auto-generated)
  * Foreign Keys: guestId (→ Guest), assignedRoomNo (→ Room)
  * Core Attributes: roomType, checkInDate, checkOutDate, bookingStatus,
- *                  priorityScore, timestamp
+ *                  paymentStatus, priorityScore, timestamp
  *
  * Implements Comparable to support BST indexing by confirmationNo
  * and Max-Heap ordering by priorityScore.
@@ -23,6 +23,7 @@ public class Reservation implements Comparable<Reservation> {
     private String checkInDate;
     private String checkOutDate;
     private String bookingStatus;     // PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED
+    private String paymentStatus;     // PAID, UNPAID
     private int priorityScore;        // Used for Max-Heap VIP ordering
     private long timestamp;           // Arrival order timestamp
 
@@ -30,9 +31,7 @@ public class Reservation implements Comparable<Reservation> {
     private Guest guest;
 
     public Reservation() {
-        this.confirmationNo = generateConfirmationNo();
-        this.bookingStatus = "PENDING";
-        this.timestamp = System.currentTimeMillis();
+        this(true);
     }
 
     public Reservation(String guestId, String roomType, String checkInDate, String checkOutDate) {
@@ -42,7 +41,24 @@ public class Reservation implements Comparable<Reservation> {
         this.checkInDate = checkInDate;
         this.checkOutDate = checkOutDate;
         this.bookingStatus = "PENDING";
+        this.paymentStatus = "UNPAID";
         this.timestamp = System.currentTimeMillis();
+    }
+
+    private Reservation(boolean assignConfirmationNo) {
+        if (assignConfirmationNo) {
+            this.confirmationNo = generateConfirmationNo();
+        }
+        this.bookingStatus = "PENDING";
+        this.paymentStatus = "UNPAID";
+        this.timestamp = System.currentTimeMillis();
+    }
+
+    /** BST lookup key — does not consume a confirmation number. */
+    public static Reservation lookupKey(String confirmationNo) {
+        Reservation key = new Reservation(false);
+        key.setConfirmationNo(confirmationNo);
+        return key;
     }
 
     private static String generateConfirmationNo() {
@@ -113,6 +129,14 @@ public class Reservation implements Comparable<Reservation> {
         this.bookingStatus = bookingStatus;
     }
 
+    public String getPaymentStatus() {
+        return paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
     public int getPriorityScore() {
         return priorityScore;
     }
@@ -158,6 +182,7 @@ public class Reservation implements Comparable<Reservation> {
     public String toString() {
         return "Reservation{confirm='" + confirmationNo + "', guestId='" + guestId
                 + "', roomType='" + roomType + "', room='" + assignedRoomNo
-                + "', status='" + bookingStatus + "', priority=" + priorityScore + "}";
+                + "', status='" + bookingStatus + "', payment='" + paymentStatus
+                + "', priority=" + priorityScore + "}";
     }
 }
