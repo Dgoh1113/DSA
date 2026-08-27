@@ -140,7 +140,7 @@ public class Main {
         mod4.setReservationResources(roomInventory, searchTree);
         FrontDeskController       mod3 = new FrontDeskController(searchTree, masterRegistry, roomInventory, mod4);
         StandardBookingController mod1 = new StandardBookingController(standardQueue, masterRegistry, roomInventory, searchTree);
-        VIPAllocationController   mod2 = new VIPAllocationController(vipQueue, masterRegistry, loyaltyAccounts, roomInventory, searchTree);
+        VIPAllocationController   mod2 = new VIPAllocationController(vipQueue, masterRegistry, roomInventory, searchTree);
 
         mod1.setUndoController(undoController);
         mod1.setLoyaltyController(mod4);
@@ -177,4 +177,3 @@ public class Main {
         );
     }
 }
-
