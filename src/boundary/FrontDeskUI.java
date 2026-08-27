@@ -93,7 +93,7 @@ public class FrontDeskUI {
         utility.UIUtils.printSectionHeader("BILLING QUERY", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Query Billing Details ");
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Record Payment ");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " View Stored Front-Desk Files (data/*.txt)");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " View Stored Front-Desk Files ");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -401,12 +401,7 @@ public class FrontDeskUI {
 
     private void viewStoredFrontDeskRecords() {
         utility.UIUtils.printSubHeader("MODULE 3 > STORED FRONT-DESK FILES", utility.UIUtils.GREEN);
-        System.out.println("Files are saved in the data folder as .txt:");
-        System.out.println("  data/checkins.txt");
-        System.out.println("  data/checkouts.txt");
-        System.out.println("  data/cancellations.txt");
-        System.out.println("  data/billing.txt");
-        System.out.println();
+        System.out.println("Files are saved in the data folder:");
         System.out.println("  1. View Check-In Records");
         System.out.println("  2. View Check-Out Records");
         System.out.println("  3. View Cancellation Records");
@@ -503,12 +498,12 @@ public class FrontDeskUI {
             return;
         }
         System.out.println("\nBILLING RECORDS (data/billing.txt)");
-        System.out.println("+-----+----------------+----------+--------+------------+---------+------------+");
-        System.out.println("| No. | Confirmation   | Guest ID | Bill   | Payment    | Nights  | Total      |");
-        System.out.println("+-----+----------------+----------+--------+------------+---------+------------+");
+        System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
+        System.out.println("| No. | Confirmation   | Guest ID | Bill       | Payment    | Nights  | Total      |");
+        System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
         for (int i = 1; i <= bills.getNumberOfEntries(); i++) {
             BillingRecord bill = bills.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-8s | %-6s | %-10s | %-7d | $%-9.2f |%n",
+            System.out.printf("| %-3d | %-14s | %-8s | %-10s | %-10s | %-7d | $%-9.2f |%n",
                     i, emptyDash(bill.getConfirmationNo()), emptyDash(bill.getGuestId()),
                     emptyDash(bill.getBillStatus()), emptyDash(bill.getPaymentStatus()),
                     bill.getNights(), bill.getGrandTotal());
