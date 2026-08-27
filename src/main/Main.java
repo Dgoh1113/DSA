@@ -151,7 +151,7 @@ public class Main {
                 checkInLog, checkOutLog, cancellationLog, billingLog);
         mod3.backfillStoredRecordsIfEmpty();
         StandardBookingController mod1 = new StandardBookingController(standardQueue, masterRegistry, roomInventory, searchTree);
-        VIPAllocationController   mod2 = new VIPAllocationController(vipQueue, masterRegistry, roomInventory, searchTree);
+        VIPAllocationController   mod2 = new VIPAllocationController(vipQueue, masterRegistry, loyaltyAccounts, roomInventory, searchTree);
 
         mod1.setUndoController(undoController);
         mod1.setLoyaltyController(mod4);
