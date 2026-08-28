@@ -65,6 +65,10 @@ public class StandardBookingUI {
                     generateQueuePerformanceReport();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
+                case 9:
+                    registerNewGuestUI();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
                 case 0:
                     exitToMainMenu = true;
                     break;
@@ -83,13 +87,14 @@ public class StandardBookingUI {
         utility.UIUtils.printSectionHeader("REGISTRATION MANAGEMENT", utility.UIUtils.CYAN);
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Modify Pending Booking");
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Cancel Pending Booking");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " Register New Guest / Member");
 
         utility.UIUtils.printSectionHeader("QUEUE MONITORING", utility.UIUtils.CYAN);
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Peek Next Guest in Queue");
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Entire Standard Queue");
 
         utility.UIUtils.printSectionHeader("REPORTS & ANALYTICS", utility.UIUtils.YELLOW);
-        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Standard Reservation Revenue Report (MergeSort)");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Reservations Revenue Analysis Report (MergeSort)");
         System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Standard Queue Performance & Shortage Report");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
@@ -114,8 +119,16 @@ public class StandardBookingUI {
 
         Guest guest = controller.findGuestById(guestIdResult.getValue());
         if (guest == null) {
-            System.out.println("\n  [!] Guest ID not found. Please register the guest before creating a booking.");
-            return false;
+            System.out.print("\n  [!] Guest ID not found. Would you like to register a new guest now? (Y/N): ");
+            String regChoice = utility.UIUtils.safeReadLine(scanner).trim();
+            if ("Y".equalsIgnoreCase(regChoice)) {
+                guest = registerNewGuestUI();
+                if (guest == null) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
         }
         if (guest.isVIP()) {
             System.out.println("\n  [!] " + guest.getName() + " is VIP eligible. Create this booking through Module 2.");
@@ -700,6 +713,67 @@ public class StandardBookingUI {
             System.out.println("  Action Recommendation    : Assign rooms to waiting guests immediately.");
         }
         System.out.println("=============================================================================");
+    }
+
+    private Guest registerNewGuestUI() {
+        utility.UIUtils.printSubHeader("MODULE 1 > REGISTER NEW GUEST", utility.UIUtils.CYAN);
+        System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type 'b' to go BACK | Type '0' to QUIT TO MAIN MENU | Type 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
+
+        String name = "";
+        String icPassport = "";
+        String contactNo = "";
+        String email = "";
+
+        int step = 0;
+        while (step >= 0 && step <= 3) {
+            switch (step) {
+                case 0: {
+                    utility.StepResult res = utility.ValidationUtils.readValidStringStep(scanner, "Step 1/4 - Guest Name       ", name, false);
+                    if (res.isGoBack()) return null;
+                    if (res.isQuitToMain() || res.isCancel()) return null;
+                    name = res.getValue();
+                    step++;
+                    break;
+                }
+                case 1: {
+                    utility.StepResult res = utility.ValidationUtils.readValidStringStep(scanner, "Step 2/4 - IC / Passport     ", icPassport, false);
+                    if (res.isGoBack()) { step--; break; }
+                    if (res.isQuitToMain() || res.isCancel()) return null;
+                    icPassport = res.getValue();
+                    step++;
+                    break;
+                }
+                case 2: {
+                    utility.StepResult res = utility.ValidationUtils.readValidStringStep(scanner, "Step 3/4 - Contact Number    ", contactNo, false);
+                    if (res.isGoBack()) { step--; break; }
+                    if (res.isQuitToMain() || res.isCancel()) return null;
+                    contactNo = res.getValue();
+                    step++;
+                    break;
+                }
+                case 3: {
+                    utility.StepResult res = utility.ValidationUtils.readValidStringStep(scanner, "Step 4/4 - Email Address     ", email, false);
+                    if (res.isGoBack()) { step--; break; }
+                    if (res.isQuitToMain() || res.isCancel()) return null;
+                    email = res.getValue();
+                    step++;
+                    break;
+                }
+            }
+        }
+
+        if (step < 0) return null;
+
+        Guest newGuest = controller.registerNewMember(name, icPassport, contactNo, email);
+        if (newGuest != null) {
+            System.out.println("\n  [+] Guest registered successfully!");
+            System.out.println("      Guest ID  : " + newGuest.getGuestId());
+            System.out.println("      Name      : " + newGuest.getName());
+            System.out.println("      Tier      : " + newGuest.getLoyaltyTier());
+        } else {
+            System.out.println("\n  [!] Guest registration failed.");
+        }
+        return newGuest;
     }
 
     private int readInt() {
