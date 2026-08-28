@@ -400,13 +400,13 @@ public class FrontDeskUI {
     }
 
     private void viewStoredFrontDeskRecords() {
-        utility.UIUtils.printSubHeader("MODULE 3 > STORED FRONT-DESK FILES", utility.UIUtils.GREEN);
-        System.out.println("Files are saved in the data folder:");
-        System.out.println("  1. View Check-In Records");
-        System.out.println("  2. View Check-Out Records");
-        System.out.println("  3. View Cancellation Records");
-        System.out.println("  4. View Billing Records");
-        System.out.println("  0. Back");
+        utility.UIUtils.printSubHeader("MODULE 3 > FRONT-DESK RECORDED FILES", utility.UIUtils.GREEN);
+        System.out.println("1. View Check-In Records");
+        System.out.println("2. View Check-Out Records");
+        System.out.println("3. View Cancellation Records");
+        System.out.println("4. View Billing Records");
+        System.out.println("0. Back");
+        System.out.println(" ");
         System.out.print("Enter your choice: ");
         int choice = utility.UIUtils.safeReadInt(scanner);
 
@@ -434,7 +434,7 @@ public class FrontDeskUI {
             System.out.println("No check-in records stored in data/checkins.txt.");
             return;
         }
-        System.out.println("\nCHECK-IN RECORDS (data/checkins.txt)");
+        System.out.println("\nCHECK-IN RECORDS ");
         System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
         System.out.println("| No. | Confirmation   | Guest ID | Guest          | Room   | Type      | Check-In   |");
         System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
@@ -455,7 +455,7 @@ public class FrontDeskUI {
             System.out.println("No check-out records stored in data/checkouts.txt.");
             return;
         }
-        System.out.println("\nCHECK-OUT RECORDS (data/checkouts.txt)");
+        System.out.println("\nCHECK-OUT RECORDS ");
         System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
         System.out.println("| No. | Confirmation   | Guest ID | Room   | Nights | Payment | Total      |");
         System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
@@ -476,7 +476,7 @@ public class FrontDeskUI {
             System.out.println("No cancellation records stored in data/cancellations.txt.");
             return;
         }
-        System.out.println("\nCANCELLATION RECORDS (data/cancellations.txt)");
+        System.out.println("\nCANCELLATION RECORDS ");
         System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
         System.out.println("| No. | Confirmation   | Guest ID | Guest          | Room   | Type      | Prev Status |");
         System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
@@ -497,7 +497,7 @@ public class FrontDeskUI {
             System.out.println("No billing records stored in data/billing.txt.");
             return;
         }
-        System.out.println("\nBILLING RECORDS (data/billing.txt)");
+        System.out.println("\nBILLING RECORDS ");
         System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
         System.out.println("| No. | Confirmation   | Guest ID | Bill       | Payment    | Nights  | Total      |");
         System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
