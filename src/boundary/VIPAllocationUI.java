@@ -103,7 +103,7 @@ public class VIPAllocationUI {
 
         Guest guest = controller.findGuestById(result.getValue());
         if (guest == null) {
-            System.out.println("\n  [!] Guest ID not found. Register the guest through Module 1 first.");
+            System.out.println("\n  [!] Guest ID not found. Please register the guest before creating a booking.");
             return false;
         }
         if (!guest.isVIP()) {
@@ -113,6 +113,34 @@ public class VIPAllocationUI {
         }
         return addVIPBookingForGuest(guest);
     }
+
+    //-----old code for addVIPBooking() method, kept for reference-----
+    // private boolean addVIPBooking() {
+    //     utility.UIUtils.printSubHeader("MODULE 2 > ADD VIP BOOKING", utility.UIUtils.YELLOW);
+    //     System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type 'b' to go BACK | Type '0' to QUIT TO MAIN MENU | Type 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
+
+    //     Guest guest;
+    //     if (authenticatedGuest != null) {
+    //         guest = authenticatedGuest;
+    //     } else {
+    //         utility.StepResult result = utility.ValidationUtils.readValidStringStep(
+    //                 scanner, "Guest ID", "", false);
+    //         if (result.isQuitToMain()) return true;
+    //         if (result.isCancel() || result.isGoBack()) return false;
+
+    //         guest = controller.findGuestById(result.getValue());
+    //         if (guest == null) {
+    //             System.out.println("\n  [!] Guest ID not found. Register the guest through Module 1 first.");
+    //             return false;
+    //         }
+    //     }
+    //     if (!guest.isVIP()) {
+    //         System.out.println("\n  [!] " + guest.getName() + " (" + guest.getGuestId()
+    //                 + ") is " + guest.getLoyaltyTier() + " and is not VIP eligible.");
+    //         return false;
+    //     }
+    //     return addVIPBookingForGuest(guest);
+    // }
 
     private boolean addVIPBookingForGuest(Guest guest) {
         System.out.println("\n  VIP Member      : " + guest.getName());
@@ -269,7 +297,6 @@ DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
         System.out.println("+------------------------------------------+");
         System.out.println("  Pending VIPs       : " + summary.getPendingCount());
         System.out.println("  Highest Priority   : " + summary.getHighestPriorityScore());
-        System.out.printf("  Average Priority   : %.2f%n", summary.getAveragePriorityScore());
         System.out.println("  SILVER             : " + summary.getSilverCount());
         System.out.println("  GOLD               : " + summary.getGoldCount());
         System.out.println("  PLATINUM           : " + summary.getPlatinumCount());
@@ -359,7 +386,7 @@ DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
             System.out.println("  [!] Invalid option. Choose from: " + permittedChoices.replace("|", " | "));
         }
     }
-
+    
     private int readInt() {
         while (!scanner.hasNextInt()) {
             System.out.print("Please enter a valid number: ");

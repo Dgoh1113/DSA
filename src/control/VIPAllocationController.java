@@ -461,7 +461,7 @@ public class VIPAllocationController {
             return getTotalRequests() == 0 ? 0.0 : allocatedCount * 100.0 / getTotalRequests();
         }
     }
-
+    
     /**
      * Finds the first available room matching the requested type.
      */

@@ -49,6 +49,19 @@ public class StandardBookingController {
         this.loyaltyController = loyaltyController;
     }
 
+    /** Finds a registered guest by ID, ignoring letter case and surrounding whitespace. */
+    public Guest findGuestById(String guestId) {
+        if (guestId == null || guestId.trim().isEmpty()) return null;
+        String normalizedId = guestId.trim();
+        for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
+            Guest guest = guestRegistry.getEntry(i);
+            if (guest != null && guest.getGuestId().equalsIgnoreCase(normalizedId)) {
+                return guest;
+            }
+        }
+        return null;
+    }
+
     /**
      * Registers a walk-in guest and creates a PENDING reservation.
      * The guest is added to the guest registry and the reservation
@@ -91,6 +104,17 @@ public class StandardBookingController {
         }
 
         return reservation;
+    }
+
+    /** Creates a standard booking for an existing, non-VIP guest profile. */
+    public Reservation registerBookingForGuest(Guest guest, String roomType,
+                                               String checkInDate, String checkOutDate) {
+        if (guest == null) return null;
+        Guest registeredGuest = findGuestById(guest.getGuestId());
+        if (registeredGuest == null || registeredGuest.isVIP()) return null;
+        return registerWalkIn(registeredGuest.getName(), registeredGuest.getIcPassport(),
+                registeredGuest.getContactNo(), registeredGuest.getEmail(), roomType,
+                checkInDate, checkOutDate);
     }
 
     /**

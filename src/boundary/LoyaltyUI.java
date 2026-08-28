@@ -165,6 +165,11 @@ public class LoyaltyUI {
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     memberId = res.getValue();
+                    Guest guest = controller.viewMemberGuest(memberId);
+                    if (guest == null) {
+                        System.out.println("  [!] ERROR: Guest ID not found: " + memberId);
+                        break;
+                    }
                     account = controller.viewMemberProfile(memberId);
                     if (account == null) {
                         System.out.println("  [!] ERROR: No loyalty account found for ID: " + memberId);
@@ -216,6 +221,11 @@ public class LoyaltyUI {
 
         if ("Room Upgrade".equalsIgnoreCase(rewardItem)) {
             redeemRoomUpgrade(memberId, account, pointsCost);
+            return false;
+        }
+
+        if ("Late Checkout".equalsIgnoreCase(rewardItem)) {
+            redeemLateCheckout(memberId, account, pointsCost);
             return false;
         }
 
@@ -276,6 +286,49 @@ public class LoyaltyUI {
         System.out.println("  Room Upgrade     : " + result.getPreviousRoomType()
                 + " -> " + result.getUpgradedRoomType());
         System.out.println("  New Room         : " + upgradedBooking.getAssignedRoomNo());
+        System.out.println("  Points Deducted  : " + transaction.getPointsDeducted());
+        System.out.println("  Remaining Points : " + account.getTotalPoints());
+    }
+
+    private void redeemLateCheckout(String memberId, LoyaltyAccount account, int pointsCost) {
+        DoublyLinkedList<Reservation> bookings = controller.getLateCheckoutBookings(memberId);
+        if (bookings.isEmpty()) {
+            System.out.println("\n[!] Late checkout unavailable: this member has no eligible booking.");
+            return;
+        }
+
+        System.out.println("\nEligible bookings (late checkout adds one calendar day):");
+        System.out.println("+-----+----------------+-----------+--------+------------+------------+");
+        System.out.println("| No. | Confirmation   | Room Type | Room   | Check-In   | Check-Out  |");
+        System.out.println("+-----+----------------+-----------+--------+------------+------------+");
+        for (int i = 1; i <= bookings.getNumberOfEntries(); i++) {
+            Reservation booking = bookings.getEntry(i);
+            System.out.printf("| %-3d | %-14s | %-9s | %-6s | %-10s | %-10s |%n",
+                    i, booking.getConfirmationNo(), booking.getRoomType(),
+                    booking.getAssignedRoomNo() == null ? "---" : booking.getAssignedRoomNo(),
+                    booking.getCheckInDate(), booking.getCheckOutDate());
+        }
+        System.out.println("+-----+----------------+-----------+--------+------------+------------+");
+        System.out.print("Enter the confirmation number to extend (or 'cancel'): ");
+        String confirmationNo = utility.UIUtils.safeReadLine(scanner);
+        if ("cancel".equalsIgnoreCase(confirmationNo)) {
+            System.out.println("Late checkout cancelled. No points were deducted.");
+            return;
+        }
+
+        LoyaltyController.LateCheckoutResult result = controller.redeemLateCheckout(
+                memberId, confirmationNo, pointsCost);
+        if (!result.isSuccessful()) {
+            System.out.println("\n[!] Late checkout failed: " + result.getErrorMessage());
+            return;
+        }
+
+        RedemptionTransaction transaction = result.getTransaction();
+        System.out.println("\n*** LATE CHECKOUT REDEMPTION SUCCESSFUL ***");
+        System.out.println("  Transaction ID   : " + transaction.getTransactionId());
+        System.out.println("  Booking          : " + result.getReservation().getConfirmationNo());
+        System.out.println("  Check-Out        : " + result.getPreviousCheckOutDate()
+                + " -> " + result.getExtendedCheckOutDate());
         System.out.println("  Points Deducted  : " + transaction.getPointsDeducted());
         System.out.println("  Remaining Points : " + account.getTotalPoints());
     }

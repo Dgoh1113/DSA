@@ -2,6 +2,8 @@ package boundary;
 
 import adt.DoublyLinkedList;
 import control.FrontDeskController;
+import entity.BillingRecord;
+import entity.FrontDeskLog;
 import entity.Guest;
 import entity.Reservation;
 import entity.Room;
@@ -55,6 +57,18 @@ public class FrontDeskUI {
                     viewRoomStatus();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
+                case 7:
+                    queryBillingDetails();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 8:
+                    recordPayment();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 9:
+                    viewStoredFrontDeskRecords();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
                 case 0:
                     exitToMainMenu = true;
                     break;
@@ -74,7 +88,12 @@ public class FrontDeskUI {
 
         utility.UIUtils.printSectionHeader("SYSTEM RECORDS & INVENTORY", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " View All Reservations (BST In-Order Sorted)");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Inventory Status");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Availability Status");
+
+        utility.UIUtils.printSectionHeader("BILLING QUERY", utility.UIUtils.GREEN);
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Query Billing Details ");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Record Payment ");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " View Stored Front-Desk Files ");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -90,8 +109,10 @@ public class FrontDeskUI {
             return;
         }
         displayReservationChoices("ALL RESERVATIONS", reservations, true);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -108,9 +129,11 @@ public class FrontDeskUI {
             System.out.println("No confirmed bookings are currently available for check-in.");
             return;
         }
-        displayCheckInReservations(eligible);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        displayEligibleReservations("BOOKINGS AVAILABLE FOR CHECK-IN", eligible);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -120,6 +143,22 @@ public class FrontDeskUI {
 
         if (!"CONFIRMED".equals(res.getBookingStatus())) {
             System.out.println("Cannot check in. Current status: " + res.getBookingStatus());
+            System.out.println("Only CONFIRMED reservations can be checked in.");
+            return;
+        }
+
+        if (!controller.isCheckInDateReached(res.getCheckInDate())) {
+            System.out.println("Cannot check in before the booked check-in date: " + res.getCheckInDate());
+            return;
+        }
+
+        Room assignedRoom = controller.findRoom(res.getAssignedRoomNo());
+        if (assignedRoom == null) {
+            System.out.println("Cannot check in. No room has been assigned to this reservation.");
+            return;
+        }
+        if ("MAINTENANCE".equals(assignedRoom.getStatus())) {
+            System.out.println("Cannot check in. Room " + assignedRoom.getRoomNo() + " is under maintenance.");
             return;
         }
 
@@ -133,7 +172,8 @@ public class FrontDeskUI {
                 System.out.println("\n*** CHECK-IN SUCCESSFUL ***");
                 System.out.println("Guest has been checked in.");
             } else {
-                System.out.println("Check-in failed. Ensure rooms are available for PENDING status.");
+                System.out.println("Check-in failed. The reservation must be CONFIRMED,");
+                System.out.println("the check-in date must have been reached, and the assigned room must be usable.");
             }
         } else {
             System.out.println("Check-in cancelled.");
@@ -148,8 +188,10 @@ public class FrontDeskUI {
             return;
         }
         displayEligibleReservations("ROOMS AVAILABLE FOR CHECK-OUT", eligible);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -168,11 +210,19 @@ public class FrontDeskUI {
         String confirm = utility.UIUtils.safeReadLine(scanner).toUpperCase();
 
         if ("Y".equals(confirm)) {
-            Reservation checkedOut = controller.checkOut(confirmNo);
+            System.out.print("Has payment been received? (Y = PAID / N = UNPAID): ");
+            String paymentInput = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+            boolean paymentReceived = "Y".equals(paymentInput);
+            Reservation checkedOut = controller.checkOut(confirmNo, paymentReceived);
             if (checkedOut != null) {
                 System.out.println("\n*** CHECK-OUT SUCCESSFUL ***");
                 System.out.println("Room " + checkedOut.getAssignedRoomNo() + " is now AVAILABLE.");
                 System.out.println("Loyalty points accrued to Guest ID: " + checkedOut.getGuestId());
+                System.out.println("Payment Status: " + (paymentReceived ? "PAID" : "UNPAID"));
+                FrontDeskController.BillingDetails bill = controller.queryBillingDetails(confirmNo);
+                if (bill != null) {
+                    displayBillingDetails(bill);
+                }
             } else {
                 System.out.println("Check-out failed.");
             }
@@ -189,8 +239,10 @@ public class FrontDeskUI {
             return;
         }
         displayReservationChoices("BOOKINGS AVAILABLE FOR CANCELLATION", eligible, true);
-        System.out.print("Enter Confirmation No: ");
-        String confirmNo = utility.UIUtils.safeReadLine(scanner);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
 
         Reservation res = controller.searchReservation(confirmNo);
         if (res == null) {
@@ -230,22 +282,23 @@ public class FrontDeskUI {
             return;
         }
 
-        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
-        System.out.println("| No. | Confirmation   | Guest ID       | Room   | Type      | Status      |");
-        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+---------+");
+        System.out.println("| No. | Confirmation   | Guest ID       | Room   | Type      | Status      | Payment |");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+---------+");
 
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation res = reservations.getEntry(i);
             String roomNo = (res.getAssignedRoomNo() != null) ? res.getAssignedRoomNo() : "---";
-            System.out.printf("| %-3d | %-14s | %-14s | %-6s | %-9s | %-11s |%n",
+            String payment = res.getPaymentStatus() == null ? "UNPAID" : res.getPaymentStatus();
+            System.out.printf("| %-3d | %-14s | %-14s | %-6s | %-9s | %-11s | %-7s |%n",
                     i, res.getConfirmationNo(), res.getGuestId(),
-                    roomNo, res.getRoomType(), res.getBookingStatus());
+                    roomNo, res.getRoomType(), res.getBookingStatus(), payment);
         }
-        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+---------+");
     }
 
     private void viewRoomStatus() {
-        utility.UIUtils.printSubHeader("MODULE 3 > VIEW ROOM INVENTORY STATUS", utility.UIUtils.GREEN);
+        utility.UIUtils.printSubHeader("MODULE 3 > VIEW ROOM AVAILABILITY STATUS", utility.UIUtils.GREEN);
         DoublyLinkedList<Room> rooms = controller.getRoomInventory();
 
         System.out.println("+--------+-----------+---------------+-------------+");
@@ -267,6 +320,248 @@ public class FrontDeskUI {
                 available, occupied, maintenance);
     }
 
+    private void queryBillingDetails() {
+        utility.UIUtils.printSubHeader("MODULE 3 > QUERY BILLING DETAILS", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+        if (reservations.isEmpty()) {
+            System.out.println("No reservations are currently available to query.");
+            return;
+        }
+        displayReservationChoices("ALL RESERVATIONS", reservations, true);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
+
+        FrontDeskController.BillingDetails bill = controller.queryBillingDetails(confirmNo);
+        if (bill == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+        displayBillingDetails(bill);
+        if ("UNPAID".equals(bill.getPaymentStatus()) && !"VOID".equals(bill.getBillStatus())) {
+            System.out.print("\nRecord this bill as PAID now? (Y/N): ");
+            String payNow = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+            if ("Y".equals(payNow)) {
+                if (controller.recordPayment(confirmNo)) {
+                    System.out.println("Payment recorded. Status is now PAID.");
+                    FrontDeskController.BillingDetails updated = controller.queryBillingDetails(confirmNo);
+                    if (updated != null) {
+                        displayBillingDetails(updated);
+                    }
+                } else {
+                    System.out.println("Unable to record payment for this confirmation number.");
+                }
+            }
+        }
+    }
+
+    private void recordPayment() {
+        utility.UIUtils.printSubHeader("MODULE 3 > RECORD PAYMENT", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> unpaid = controller.getUnpaidReservations();
+        if (unpaid.isEmpty()) {
+            System.out.println("There are no unpaid bills to record.");
+            return;
+        }
+        displayReservationChoices("UNPAID BILLS", unpaid, true);
+        String confirmNo = promptConfirmationNo();
+        if (confirmNo == null) {
+            return;
+        }
+
+        FrontDeskController.BillingDetails bill = controller.queryBillingDetails(confirmNo);
+        if (bill == null) {
+            System.out.println("No reservation found with Confirmation No: " + confirmNo);
+            return;
+        }
+        displayBillingDetails(bill);
+
+        if ("PAID".equals(bill.getPaymentStatus())) {
+            System.out.println("This bill is already PAID.");
+            return;
+        }
+        if ("VOID".equals(bill.getBillStatus())) {
+            System.out.println("Cancelled bookings have no payment due.");
+            return;
+        }
+
+        System.out.print("\nConfirm payment received? (Y/N): ");
+        String confirm = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+        if ("Y".equals(confirm)) {
+            if (controller.recordPayment(confirmNo)) {
+                System.out.println("\n*** PAYMENT RECORDED ***");
+                System.out.println("Confirmation No " + confirmNo + " is now PAID.");
+            } else {
+                System.out.println("Payment could not be recorded.");
+            }
+        } else {
+            System.out.println("Payment recording aborted.");
+        }
+    }
+
+    private void viewStoredFrontDeskRecords() {
+        utility.UIUtils.printSubHeader("MODULE 3 > FRONT-DESK RECORDED FILES", utility.UIUtils.GREEN);
+        System.out.println("1. View Check-In Records");
+        System.out.println("2. View Check-Out Records");
+        System.out.println("3. View Cancellation Records");
+        System.out.println("4. View Billing Records");
+        System.out.println("0. Back");
+        System.out.println(" ");
+        System.out.print("Enter your choice: ");
+        int choice = utility.UIUtils.safeReadInt(scanner);
+
+        switch (choice) {
+            case 1:
+                displayCheckInLog();
+                break;
+            case 2:
+                displayCheckOutLog();
+                break;
+            case 3:
+                displayCancellationLog();
+                break;
+            case 4:
+                displayBillingLog();
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void displayCheckInLog() {
+        DoublyLinkedList<FrontDeskLog> logs = controller.getCheckInLog();
+        if (logs.isEmpty()) {
+            System.out.println("No check-in records stored in data/checkins.txt.");
+            return;
+        }
+        System.out.println("\nCHECK-IN RECORDS ");
+        System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
+        System.out.println("| No. | Confirmation   | Guest ID | Guest          | Room   | Type      | Check-In   |");
+        System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
+        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
+            FrontDeskLog log = logs.getEntry(i);
+            System.out.printf("| %-3d | %-14s | %-8s | %-14s | %-6s | %-9s | %-10s |%n",
+                    i, emptyDash(log.getConfirmationNo()), emptyDash(log.getGuestId()),
+                    truncate(log.getGuestName(), 14), emptyDash(log.getRoomNo()),
+                    emptyDash(log.getRoomType()), emptyDash(log.getCheckInDate()));
+        }
+        System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
+        System.out.println("Total records: " + logs.getNumberOfEntries());
+    }
+
+    private void displayCheckOutLog() {
+        DoublyLinkedList<FrontDeskLog> logs = controller.getCheckOutLog();
+        if (logs.isEmpty()) {
+            System.out.println("No check-out records stored in data/checkouts.txt.");
+            return;
+        }
+        System.out.println("\nCHECK-OUT RECORDS ");
+        System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
+        System.out.println("| No. | Confirmation   | Guest ID | Room   | Nights | Payment | Total      |");
+        System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
+        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
+            FrontDeskLog log = logs.getEntry(i);
+            System.out.printf("| %-3d | %-14s | %-8s | %-6s | %-6d | %-7s | $%-9.2f |%n",
+                    i, emptyDash(log.getConfirmationNo()), emptyDash(log.getGuestId()),
+                    emptyDash(log.getRoomNo()), log.getNights(),
+                    emptyDash(log.getPaymentStatus()), log.getGrandTotal());
+        }
+        System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
+        System.out.println("Total records: " + logs.getNumberOfEntries());
+    }
+
+    private void displayCancellationLog() {
+        DoublyLinkedList<FrontDeskLog> logs = controller.getCancellationLog();
+        if (logs.isEmpty()) {
+            System.out.println("No cancellation records stored in data/cancellations.txt.");
+            return;
+        }
+        System.out.println("\nCANCELLATION RECORDS ");
+        System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
+        System.out.println("| No. | Confirmation   | Guest ID | Guest          | Room   | Type      | Prev Status |");
+        System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
+        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
+            FrontDeskLog log = logs.getEntry(i);
+            System.out.printf("| %-3d | %-14s | %-8s | %-14s | %-6s | %-9s | %-11s |%n",
+                    i, emptyDash(log.getConfirmationNo()), emptyDash(log.getGuestId()),
+                    truncate(log.getGuestName(), 14), emptyDash(log.getRoomNo()),
+                    emptyDash(log.getRoomType()), emptyDash(log.getPreviousStatus()));
+        }
+        System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
+        System.out.println("Total records: " + logs.getNumberOfEntries());
+    }
+
+    private void displayBillingLog() {
+        DoublyLinkedList<BillingRecord> bills = controller.getBillingLog();
+        if (bills.isEmpty()) {
+            System.out.println("No billing records stored in data/billing.txt.");
+            return;
+        }
+        System.out.println("\nBILLING RECORDS ");
+        System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
+        System.out.println("| No. | Confirmation   | Guest ID | Bill       | Payment    | Nights  | Total      |");
+        System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
+        for (int i = 1; i <= bills.getNumberOfEntries(); i++) {
+            BillingRecord bill = bills.getEntry(i);
+            System.out.printf("| %-3d | %-14s | %-8s | %-10s | %-10s | %-7d | $%-9.2f |%n",
+                    i, emptyDash(bill.getConfirmationNo()), emptyDash(bill.getGuestId()),
+                    emptyDash(bill.getBillStatus()), emptyDash(bill.getPaymentStatus()),
+                    bill.getNights(), bill.getGrandTotal());
+        }
+        System.out.println("+-----+----------------+----------+--------+------------+---------+------------+");
+        System.out.println("Total records: " + bills.getNumberOfEntries());
+    }
+
+    private String emptyDash(String value) {
+        return (value == null || value.trim().isEmpty()) ? "---" : value;
+    }
+
+    private String truncate(String value, int max) {
+        String text = emptyDash(value);
+        if (text.length() <= max) {
+            return text;
+        }
+        return text.substring(0, max);
+    }
+
+    private void displayBillingDetails(FrontDeskController.BillingDetails bill) {
+        System.out.println("\n+----------------------------------------------------+");
+        System.out.println("                   BILLING DETAILS");
+        System.out.println("+----------------------------------------------------+");
+        System.out.println("  Confirmation No : " + bill.getConfirmationNo());
+        System.out.println("  Bill Status     : " + bill.getBillStatus());
+        System.out.println("  Payment Status  : " + bill.getPaymentStatus());
+        System.out.println("  Booking Status  : " + bill.getBookingStatus());
+        System.out.println("+----------------------------------------------------+");
+        System.out.println("  Guest ID        : " + bill.getGuestId());
+        System.out.println("  Guest Name      : " + bill.getGuestName());
+        System.out.println("  Loyalty Tier    : " + bill.getLoyaltyTier());
+        System.out.println("+----------------------------------------------------+");
+        System.out.println("  Room Number     : " + bill.getRoomNo());
+        System.out.println("  Room Type       : " + bill.getRoomType());
+        System.out.println("  Check-In Date   : " + bill.getCheckInDate());
+        System.out.println("  Check-Out Date  : " + bill.getCheckOutDate());
+        System.out.println("  Stay Duration   : " + bill.getNights()
+                + (bill.getNights() == 1 ? " night" : " nights"));
+        System.out.println("+----------------------------------------------------+");
+        System.out.printf("  Nightly Rate    : $%.2f%n", bill.getNightlyRate());
+        System.out.printf("  Room Charges    : $%.2f  (%d x $%.2f)%n",
+                bill.getRoomCharges(), bill.getNights(), bill.getNightlyRate());
+        System.out.printf("  Loyalty Discount: -$%.2f  (%.0f%% %s)%n",
+                bill.getDiscountAmount(), bill.getDiscountRate() * 100, bill.getLoyaltyTier());
+        System.out.printf("  SST (%.0f%%)        : $%.2f%n", bill.getTaxRate() * 100, bill.getTaxAmount());
+        System.out.println("+----------------------------------------------------+");
+        System.out.printf("  GRAND TOTAL     : $%.2f%n", bill.getGrandTotal());
+        if ("VOID".equals(bill.getBillStatus())) {
+            System.out.println("  Note            : Cancelled booking — no payment due.");
+        } else if ("UNPAID".equals(bill.getPaymentStatus())) {
+            System.out.println("  Note            : Balance outstanding — status UNPAID.");
+        } else {
+            System.out.println("  Note            : Payment received — status PAID.");
+        }
+        System.out.println("+----------------------------------------------------+");
+    }
+
     private void displayReservationDetails(Reservation res) {
         Guest guest = controller.findGuest(res.getGuestId());
         Room room = controller.findRoom(res.getAssignedRoomNo());
@@ -276,6 +571,7 @@ public class FrontDeskUI {
         System.out.println("+------------------------------------------+");
         System.out.println("  Confirmation No : " + res.getConfirmationNo());
         System.out.println("  Booking Status  : " + res.getBookingStatus());
+        System.out.println("  Payment Status  : " + (res.getPaymentStatus() == null ? "UNPAID" : res.getPaymentStatus()));
         System.out.println("+------------------------------------------+");
         System.out.println("  GUEST INFORMATION");
         if (guest != null) {
@@ -307,24 +603,6 @@ public class FrontDeskUI {
     private void displayEligibleReservations(String title,
                                               DoublyLinkedList<Reservation> reservations) {
         displayReservationChoices(title, reservations, false);
-    }
-
-    private void displayCheckInReservations(DoublyLinkedList<Reservation> reservations) {
-        System.out.println("\nBOOKINGS AVAILABLE FOR CHECK-IN");
-        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
-        System.out.println("| No. | Confirmation   | Guest Name     | Loyalty Tier   | Check-In | Status     |");
-        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
-        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
-            Reservation reservation = reservations.getEntry(i);
-            Guest guest = reservation.getGuest() != null
-                    ? reservation.getGuest() : controller.findGuest(reservation.getGuestId());
-            String guestName = guest == null ? "N/A" : guest.getName();
-            String loyaltyTier = guest == null ? "N/A" : guest.getLoyaltyTier();
-            System.out.printf("| %-3d | %-14s | %-14s | %-14s | %-8s | %-10s |%n",
-                    i, reservation.getConfirmationNo(), guestName, loyaltyTier,
-                    reservation.getCheckInDate(), reservation.getBookingStatus());
-        }
-        System.out.println("+-----+----------------+----------------+----------------+----------+------------+");
     }
 
     private void displayReservationChoices(String title,
@@ -362,11 +640,13 @@ public class FrontDeskUI {
         System.out.println();
     }
 
-    private int readInt() {
-        while (!scanner.hasNextInt()) {
-            System.out.print("Please enter a valid number: ");
-            scanner.next();
+    private String promptConfirmationNo() {
+        System.out.print("Enter Confirmation No (8 digits): ");
+        String confirmNo = utility.UIUtils.safeReadLine(scanner).trim();
+        if (!controller.isValidConfirmationNo(confirmNo)) {
+            System.out.println("Invalid confirmation number. Please enter an 8-digit number.");
+            return null;
         }
-        return scanner.nextInt();
+        return confirmNo;
     }
 }

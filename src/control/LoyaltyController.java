@@ -132,7 +132,7 @@ public class LoyaltyController {
      */
     public RedemptionTransaction redeemPoints(String memberId, String rewardItem, int pointsCost) {
         LoyaltyAccount account = findAccount(memberId);
-        if (account == null || account.getTotalPoints() < pointsCost) {
+        if (findGuest(memberId) == null || account == null || account.getTotalPoints() < pointsCost) {
             return null; // Insufficient points or account not found
         }
 
@@ -179,13 +179,15 @@ public class LoyaltyController {
      */
     public DoublyLinkedList<Reservation> getRoomUpgradeBookings(String memberId) {
         DoublyLinkedList<Reservation> bookings = new DoublyLinkedList<>();
-        if (reservationRegistry == null || memberId == null) return bookings;
+        if (reservationRegistry == null || memberId == null || memberId.trim().isEmpty()) return bookings;
+
+        String normalizedMemberId = memberId.trim();
 
         DoublyLinkedList<Reservation> reservations = reservationRegistry.inOrderTraversal();
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation reservation = reservations.getEntry(i);
             if (reservation != null
-                    && memberId.equalsIgnoreCase(reservation.getGuestId())
+                    && normalizedMemberId.equalsIgnoreCase(reservation.getGuestId())
                     && ("PENDING".equals(reservation.getBookingStatus())
                         || "CONFIRMED".equals(reservation.getBookingStatus()))) {
                 bookings.add(reservation);
@@ -213,9 +215,16 @@ public class LoyaltyController {
                     + " points but have " + account.getTotalPoints() + ".");
         }
 
-        Reservation reservation = findActiveBooking(memberId, confirmationNo);
+        Reservation reservation = findReservation(confirmationNo);
         if (reservation == null) {
-            return RoomUpgradeResult.failure("No active booking was found for that confirmation number.");
+            return RoomUpgradeResult.failure("No booking was found for that confirmation number.");
+        }
+        if (!belongsToMember(reservation, memberId)) {
+            return RoomUpgradeResult.failure("This booking belongs to another guest. Enter a confirmation number for Guest ID "
+                    + account.getMemberId() + ".");
+        }
+        if (!isRoomUpgradeEligible(reservation)) {
+            return RoomUpgradeResult.failure("This booking is not active and cannot be upgraded.");
         }
 
         String currentType = reservation.getRoomType();
@@ -282,6 +291,102 @@ public class LoyaltyController {
         }
 
         return RoomUpgradeResult.success(transaction, reservation, currentType, upgradedType);
+    }
+
+    /**
+     * Returns bookings whose check-out date can still be extended. A guest may
+     * redeem late checkout before arrival, after confirmation, or while checked
+     * in, but never after the stay has been checked out or cancelled.
+     */
+    public DoublyLinkedList<Reservation> getLateCheckoutBookings(String memberId) {
+        DoublyLinkedList<Reservation> bookings = new DoublyLinkedList<>();
+        if (reservationRegistry == null || memberId == null || memberId.trim().isEmpty()) return bookings;
+
+        String normalizedMemberId = memberId.trim();
+
+        DoublyLinkedList<Reservation> reservations = reservationRegistry.inOrderTraversal();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            if (reservation != null && normalizedMemberId.equalsIgnoreCase(reservation.getGuestId())
+                    && isLateCheckoutEligible(reservation)) {
+                bookings.add(reservation);
+            }
+        }
+        return bookings;
+    }
+
+    /**
+     * Redeems a late checkout for one booking. The reward extends the recorded
+     * checkout date by exactly one calendar day, so billing and the eventual
+     * checkout log use the new stay length.
+     */
+    public LateCheckoutResult redeemLateCheckout(String memberId, String confirmationNo,
+                                                  int pointsCost) {
+        LoyaltyAccount account = findAccount(memberId);
+        if (account == null) {
+            return LateCheckoutResult.failure("No loyalty account was found for this member.");
+        }
+        if (reservationRegistry == null) {
+            return LateCheckoutResult.failure("Late checkout service is not configured.");
+        }
+        if (account.getTotalPoints() < pointsCost) {
+            return LateCheckoutResult.failure("Insufficient points. You need " + pointsCost
+                    + " points but have " + account.getTotalPoints() + ".");
+        }
+
+        Reservation reservation = findReservation(confirmationNo);
+        if (reservation == null) {
+            return LateCheckoutResult.failure("No booking was found for that confirmation number.");
+        }
+        if (!belongsToMember(reservation, memberId)) {
+            return LateCheckoutResult.failure("This booking belongs to another guest. Enter a confirmation number for Guest ID "
+                    + account.getMemberId() + ".");
+        }
+        if (!isLateCheckoutStatusEligible(reservation)) {
+            return LateCheckoutResult.failure("Late checkout is unavailable for a cancelled or checked-out booking.");
+        }
+        if (!hasAssignedRoom(reservation)) {
+            return LateCheckoutResult.failure("Late checkout requires a room to be assigned to this booking first.");
+        }
+
+        String previousCheckOutDate = reservation.getCheckOutDate();
+        final String extendedCheckOutDate;
+        try {
+            extendedCheckOutDate = java.time.LocalDate.parse(previousCheckOutDate)
+                    .plusDays(1).toString();
+        } catch (Exception e) {
+            return LateCheckoutResult.failure("This booking has an invalid check-out date and cannot be extended.");
+        }
+
+        reservation.setCheckOutDate(extendedCheckOutDate);
+        account.setTotalPoints(account.getTotalPoints() - pointsCost);
+        String reward = "Late Checkout (Conf #" + reservation.getConfirmationNo() + ": "
+                + previousCheckOutDate + " -> " + extendedCheckOutDate + ")";
+        account.addHistoryEntry("-" + pointsCost + " pts (Redeemed: " + reward + ")");
+        RedemptionTransaction transaction = new RedemptionTransaction(
+                memberId, reward, pointsCost, getCurrentDate());
+        redemptionLog.add(transaction);
+        checkAndUpgradeTier(memberId);
+
+        if (undoController != null) {
+            undoController.recordAction(
+                "LATE_CHECKOUT_REDEMPTION",
+                "Module 4: Loyalty & Rewards",
+                "Extended Conf #" + confirmationNo + " check-out from "
+                        + previousCheckOutDate + " to " + extendedCheckOutDate,
+                () -> {
+                    reservation.setCheckOutDate(previousCheckOutDate);
+                    account.setTotalPoints(account.getTotalPoints() + pointsCost);
+                    account.addHistoryEntry("+" + pointsCost
+                            + " pts (REFUND: Undone " + reward + ")");
+                    removeTransaction(transaction);
+                    checkAndUpgradeTier(memberId);
+                }
+            );
+        }
+
+        return LateCheckoutResult.success(transaction, reservation,
+                previousCheckOutDate, extendedCheckOutDate);
     }
 
     /**
@@ -541,6 +646,54 @@ public class LoyaltyController {
         return null;
     }
 
+    /** Looks up a reservation by confirmation number without bypassing ownership checks. */
+    private Reservation findReservation(String confirmationNo) {
+        if (reservationRegistry == null || confirmationNo == null || confirmationNo.trim().isEmpty()) {
+            return null;
+        }
+        return reservationRegistry.search(Reservation.lookupKey(confirmationNo.trim()));
+    }
+
+    private boolean belongsToMember(Reservation reservation, String memberId) {
+        return reservation != null && reservation.getGuestId() != null && memberId != null
+                && reservation.getGuestId().equalsIgnoreCase(memberId.trim());
+    }
+
+    private boolean isRoomUpgradeEligible(Reservation reservation) {
+        String status = reservation.getBookingStatus();
+        return "PENDING".equals(status) || "CONFIRMED".equals(status);
+    }
+
+    private Reservation findLateCheckoutBooking(String memberId, String confirmationNo) {
+        if (confirmationNo == null) return null;
+        DoublyLinkedList<Reservation> bookings = getLateCheckoutBookings(memberId);
+        for (int i = 1; i <= bookings.getNumberOfEntries(); i++) {
+            Reservation booking = bookings.getEntry(i);
+            if (confirmationNo.trim().equals(booking.getConfirmationNo())) {
+                return booking;
+            }
+        }
+        return null;
+    }
+
+    private boolean isLateCheckoutEligible(Reservation reservation) {
+        return hasAssignedRoom(reservation) && isLateCheckoutStatusEligible(reservation);
+    }
+
+    private boolean isLateCheckoutStatusEligible(Reservation reservation) {
+        String status = reservation.getBookingStatus();
+        return "PENDING".equals(status) || "CONFIRMED".equals(status)
+                || "CHECKED_IN".equals(status);
+    }
+
+    private boolean hasAssignedRoom(Reservation reservation) {
+        if (reservation == null || reservation.getAssignedRoomNo() == null
+                || reservation.getAssignedRoomNo().trim().isEmpty()) {
+            return false;
+        }
+        return roomInventory != null && findRoom(reservation.getAssignedRoomNo()) != null;
+    }
+
     private Room findRoom(String roomNo) {
         if (roomNo == null) return null;
         for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
@@ -626,6 +779,44 @@ public class LoyaltyController {
         public Reservation getReservation() { return reservation; }
         public String getPreviousRoomType() { return previousRoomType; }
         public String getUpgradedRoomType() { return upgradedRoomType; }
+        public String getErrorMessage() { return errorMessage; }
+    }
+
+    /** Result returned by a late-checkout redemption. */
+    public static class LateCheckoutResult {
+        private final RedemptionTransaction transaction;
+        private final Reservation reservation;
+        private final String previousCheckOutDate;
+        private final String extendedCheckOutDate;
+        private final String errorMessage;
+
+        private LateCheckoutResult(RedemptionTransaction transaction, Reservation reservation,
+                                   String previousCheckOutDate, String extendedCheckOutDate,
+                                   String errorMessage) {
+            this.transaction = transaction;
+            this.reservation = reservation;
+            this.previousCheckOutDate = previousCheckOutDate;
+            this.extendedCheckOutDate = extendedCheckOutDate;
+            this.errorMessage = errorMessage;
+        }
+
+        public static LateCheckoutResult success(RedemptionTransaction transaction,
+                                                  Reservation reservation,
+                                                  String previousCheckOutDate,
+                                                  String extendedCheckOutDate) {
+            return new LateCheckoutResult(transaction, reservation, previousCheckOutDate,
+                    extendedCheckOutDate, null);
+        }
+
+        public static LateCheckoutResult failure(String errorMessage) {
+            return new LateCheckoutResult(null, null, null, null, errorMessage);
+        }
+
+        public boolean isSuccessful() { return transaction != null; }
+        public RedemptionTransaction getTransaction() { return transaction; }
+        public Reservation getReservation() { return reservation; }
+        public String getPreviousCheckOutDate() { return previousCheckOutDate; }
+        public String getExtendedCheckOutDate() { return extendedCheckOutDate; }
         public String getErrorMessage() { return errorMessage; }
     }
 
