@@ -119,8 +119,6 @@ public class Main {
             partnerRegistry.add(p5);
             partnerRegistry.add(p6);
 
-            // Seed initial customer product referrals
-           
             // Save seeded data to text files
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
@@ -134,7 +132,7 @@ public class Main {
         // 2. Create Controllers (Control layer)
         //    — inject the shared data structures
         // ============================
-      LinkedStack<entity.UndoAction> undoStack     = new LinkedStack<>();
+        LinkedStack<entity.UndoAction> undoStack     = new LinkedStack<>();
         control.UndoController undoController        = new control.UndoController(undoStack);
 
         LoyaltyController         mod4 = new LoyaltyController(masterRegistry, loyaltyAccounts, redemptionLog);
@@ -151,7 +149,6 @@ public class Main {
         mod2.setUndoController(undoController);
         mod3.setUndoController(undoController);
         mod4.setUndoController(undoController);
-  
 
         // Register auto-save shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

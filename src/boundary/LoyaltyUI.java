@@ -84,8 +84,8 @@ public class LoyaltyUI {
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " View Transaction History");
 
         utility.UIUtils.printSectionHeader("MANAGEMENT & ANALYTICS REPORTS", utility.UIUtils.MAGENTA);
-        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Report: Top Point Earners (MergeSort O(n log n))");
-        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Report: Expiring Points (QuickSort O(n log n))");
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Report: Top Point Earners (MergeSort)");
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Report: Expiring Points (QuickSort)");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Report: Members by Tier");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Report Generator (Search + Multi-Filter + MergeSort)");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " View All Members");
@@ -98,8 +98,12 @@ public class LoyaltyUI {
 
     private void viewMemberProfile() {
         utility.UIUtils.printSubHeader("MODULE 4 > VIEW MEMBER PROFILE", utility.UIUtils.MAGENTA);
-        System.out.print("Enter Member / Guest ID: ");
+        System.out.print("Enter Member / Guest ID (or 'cancel'): ");
         String memberId = utility.UIUtils.safeReadLine(scanner);
+        if (isCancelled(memberId)) {
+            printCancellationMessage();
+            return;
+        }
 
         LoyaltyAccount account = controller.viewMemberProfile(memberId);
         if (account == null) {
@@ -162,8 +166,15 @@ public class LoyaltyUI {
             switch (step) {
                 case 0: {
                     utility.StepResult res = utility.ValidationUtils.readValidStringStep(scanner, "Step 1/2 - Enter Member / Guest ID ", memberId, false);
+                    if (res.isGoBack()) {
+                        System.out.println("\n  [!] Point redemption cancelled. No data saved.");
+                        return false;
+                    }
                     if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
+                    if (res.isCancel()) {
+                        System.out.println("\n  [!] Point redemption cancelled. No data saved.");
+                        return false;
+                    }
                     memberId = res.getValue();
                     Guest guest = controller.viewMemberGuest(memberId);
                     if (guest == null) {
@@ -181,27 +192,34 @@ public class LoyaltyUI {
                 }
                 case 1: {
                     System.out.println("\nAvailable Rewards:");
-                    System.out.println("  1. Room Upgrade     - 500 pts (active booking required)");
-                    System.out.println("  2. Free Breakfast   - 300 pts");
-                    System.out.println("  3. Spa Voucher      - 800 pts");
-                    System.out.println("  4. Late Checkout    - 200 pts");
+                    System.out.println("  1. Room Upgrade     - 1000 pts (active booking required)");
+                    System.out.println("  2. Late Checkout   - 800 pts");
+                    System.out.println("  3. Free Breakfast     - 350 pts");
+                    System.out.println("  4. Spa Voucher      - 300 pts");
                     utility.StepResult res = utility.ValidationUtils.readValidStringStep(scanner, "Step 2/2 - Select reward (1-4) or enter reward name", rewardItem, false);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
+                    if (res.isCancel()) {
+                        System.out.println("\n  [!] Point redemption cancelled. No data saved.");
+                        return false;
+                    }
 
                     String input = res.getValue();
-                    if (input.equals("1")) { rewardItem = "Room Upgrade"; pointsCost = 500; }
-                    else if (input.equals("2")) { rewardItem = "Free Breakfast"; pointsCost = 300; }
-                    else if (input.equals("3")) { rewardItem = "Spa Voucher"; pointsCost = 800; }
-                    else if (input.equals("4")) { rewardItem = "Late Checkout"; pointsCost = 200; }
-                    else if (input.equalsIgnoreCase("room upgrade")) {
+                    if (input.equals("1") || input.equalsIgnoreCase("room upgrade")) {
                         rewardItem = "Room Upgrade";
-                        pointsCost = 500;
-                    }
-                    else {
-                        rewardItem = input;
-                        pointsCost = 200;
+                        pointsCost = 1000;
+                    } else if (input.equals("2") || input.equalsIgnoreCase("late checkout")) {
+                        rewardItem = "Late Checkout";
+                        pointsCost = 800;
+                    } else if (input.equals("3") || input.equalsIgnoreCase("free breakfast")) {
+                        rewardItem = "Free Breakfast";
+                        pointsCost = 350;
+                    } else if (input.equals("4") || input.equalsIgnoreCase("spa voucher")) {
+                        rewardItem = "Spa Voucher";
+                        pointsCost = 300;
+                    } else {
+                        System.out.println("  [!] ERROR: Select 1-4 or enter a listed reward name.");
+                        break;
                     }
                     step++;
                     break;
@@ -335,8 +353,12 @@ public class LoyaltyUI {
 
     private void viewTransactionHistory() {
         utility.UIUtils.printSubHeader("MODULE 4 > VIEW TRANSACTION HISTORY", utility.UIUtils.MAGENTA);
-        System.out.print("Enter Member / Guest ID: ");
+        System.out.print("Enter Member / Guest ID (or 'cancel'): ");
         String memberId = utility.UIUtils.safeReadLine(scanner);
+        if (isCancelled(memberId)) {
+            printCancellationMessage();
+            return;
+        }
 
         DoublyLinkedList<RedemptionTransaction> history = controller.getTransactionHistory(memberId);
         if (history.isEmpty()) {
@@ -376,13 +398,16 @@ public class LoyaltyUI {
                     i, acc.getMemberId(), acc.getTotalPoints(), acc.getTierStatus());
         }
         System.out.println("+------+----------------+-----------+----------+");
-        System.out.println("Sorted using MergeSort algorithm — O(n log n)");
+        System.out.println("Sorted using MergeSort algorithm");
     }
 
     private void expiringPointsReport() {
         utility.UIUtils.printSubHeader("MODULE 4 > REPORT: EXPIRING POINTS (QUICKSORT)", utility.UIUtils.MAGENTA);
-        System.out.print("Days threshold (e.g., 30): ");
-        int days = utility.UIUtils.safeReadInt(scanner);
+        Integer days = readNonNegativeInteger("Days threshold (e.g., 30, or 'cancel'): ");
+        if (days == null) {
+            printCancellationMessage();
+            return;
+        }
 
         DoublyLinkedList<LoyaltyAccount> result = controller.generateExpiringPointsReport(days);
         if (result.isEmpty()) {
@@ -401,46 +426,18 @@ public class LoyaltyUI {
                     acc.getTierStatus(), acc.getPointsExpiryDate());
         }
         System.out.println("+------+----------------+-----------+----------+-------------+");
-        System.out.println("Sorted using QuickSort algorithm — O(n log n)");
+        System.out.println("Sorted using QuickSort algorithm");
     }
 
     private void tierReport() {
         utility.UIUtils.printSubHeader("MODULE 4 > REPORT: MEMBERS BY TIER", utility.UIUtils.MAGENTA);
-        
-        System.out.println("  Select Loyalty Tier(s) to filter by:");
-        System.out.println("    1. STANDARD");
-        System.out.println("    2. SILVER");
-        System.out.println("    3. GOLD");
-        System.out.println("    4. PLATINUM");
-        System.out.println("    5. DIAMOND");
-        System.out.println("    6. ALL");
-        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 6 for ALL): ");
-        String tierInput = utility.UIUtils.safeReadLine(scanner).trim();
-        DoublyLinkedList<String> tierFilters = new DoublyLinkedList<>();
-        if (tierInput.isEmpty()) {
-            tierFilters.add("ALL");
-        } else {
-            String[] parts = tierInput.split(",");
-            for (String part : parts) {
-                String choice = part.trim();
-                switch (choice) {
-                    case "1": tierFilters.add("STANDARD"); break;
-                    case "2": tierFilters.add("SILVER"); break;
-                    case "3": tierFilters.add("GOLD"); break;
-                    case "4": tierFilters.add("PLATINUM"); break;
-                    case "5": tierFilters.add("DIAMOND"); break;
-                    case "6":
-                    default:
-                        if (choice.equals("6")) {
-                            tierFilters.add("ALL");
-                        }
-                        break;
-                }
-            }
+        System.out.println("Select Tier: STANDARD | SILVER | GOLD | PLATINUM | DIAMOND (or 'cancel')");
+        utility.StepResult tierResult = utility.ValidationUtils.readValidLoyaltyTierStep(scanner, "Tier", null);
+        if (tierResult.isCancel() || tierResult.isQuitToMain()) {
+            printCancellationMessage();
+            return;
         }
-        if (tierFilters.isEmpty()) {
-            tierFilters.add("ALL");
-        }
+        String tier = tierResult.getValue();
 
         DoublyLinkedList<LoyaltyAccount> result = controller.generateTierReport(tierFilters);
         if (result.isEmpty()) {
@@ -490,48 +487,37 @@ public class LoyaltyUI {
     private void managementReportGenerator() {
         utility.UIUtils.printSubHeader("MODULE 4 > LOYALTY REPORT GENERATOR", utility.UIUtils.MAGENTA);
         System.out.println("Create a ranked loyalty summary using member search and multiple filters.");
+        System.out.println("Type 'cancel' at any prompt to abandon this report.");
 
-        System.out.println("  Select Loyalty Tier(s) to filter by:");
-        System.out.println("    1. STANDARD");
-        System.out.println("    2. SILVER");
-        System.out.println("    3. GOLD");
-        System.out.println("    4. PLATINUM");
-        System.out.println("    5. DIAMOND");
-        System.out.println("    6. ALL");
-        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 6 for ALL): ");
-        String tierInput = utility.UIUtils.safeReadLine(scanner).trim();
-        DoublyLinkedList<String> tierFilters = new DoublyLinkedList<>();
-        if (tierInput.isEmpty()) {
-            tierFilters.add("ALL");
-        } else {
-            String[] parts = tierInput.split(",");
-            for (String part : parts) {
-                String choice = part.trim();
-                switch (choice) {
-                    case "1": tierFilters.add("STANDARD"); break;
-                    case "2": tierFilters.add("SILVER"); break;
-                    case "3": tierFilters.add("GOLD"); break;
-                    case "4": tierFilters.add("PLATINUM"); break;
-                    case "5": tierFilters.add("DIAMOND"); break;
-                    case "6":
-                    default:
-                        if (choice.equals("6")) {
-                            tierFilters.add("ALL");
-                        }
-                        break;
-                }
+        String tierFilter;
+        do {
+            System.out.print("Tier filter (ALL / STANDARD / SILVER / GOLD / PLATINUM / DIAMOND): ");
+            tierFilter = utility.UIUtils.safeReadLine(scanner).toUpperCase();
+            if (isCancelled(tierFilter)) {
+                printCancellationMessage();
+                return;
             }
-        }
-        if (tierFilters.isEmpty()) {
-            tierFilters.add("ALL");
-        }
+            if (tierFilter.isEmpty()) tierFilter = "ALL";
+        } while (!"ALL".equals(tierFilter) && !"STANDARD".equals(tierFilter)
+                && !"SILVER".equals(tierFilter) && !"GOLD".equals(tierFilter)
+                && !"PLATINUM".equals(tierFilter) && !"DIAMOND".equals(tierFilter));
 
-        System.out.print("  Minimum points (0 for no minimum): ");
-        int minimumPoints = Math.max(0, utility.UIUtils.safeReadInt(scanner));
-        System.out.print("  Points expiry window in days (0 to ignore expiry): ");
-        int expiryWindow = Math.max(0, utility.UIUtils.safeReadInt(scanner));
-        System.out.print("  Search by member ID or member name (press ENTER for all): ");
+        Integer minimumPoints = readNonNegativeInteger("Minimum points (0 for no minimum, or 'cancel'): ");
+        if (minimumPoints == null) {
+            printCancellationMessage();
+            return;
+        }
+        Integer expiryWindow = readNonNegativeInteger("Points expiry window in days (0 to ignore expiry, or 'cancel'): ");
+        if (expiryWindow == null) {
+            printCancellationMessage();
+            return;
+        }
+        System.out.print("Search by member ID or member name (press ENTER for all, or 'cancel'): ");
         String memberSearch = utility.UIUtils.safeReadLine(scanner);
+        if (isCancelled(memberSearch)) {
+            printCancellationMessage();
+            return;
+        }
 
         DoublyLinkedList<LoyaltyController.ManagementReportEntry> report =
                 controller.generateManagementReport(
@@ -586,5 +572,30 @@ public class LoyaltyUI {
             scanner.next();
         }
         return scanner.nextInt();
+    }
+
+    /** Reads a whole-number filter while allowing the current operation to be cancelled. */
+    private Integer readNonNegativeInteger(String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            String input = utility.UIUtils.safeReadLine(scanner);
+            if (isCancelled(input)) return null;
+
+            try {
+                int value = Integer.parseInt(input);
+                if (value >= 0) return value;
+            } catch (NumberFormatException e) {
+                // Show the same validation message for non-numeric input.
+            }
+            System.out.println("  [!] ERROR: Please enter a whole number that is zero or greater.");
+        }
+    }
+
+    private boolean isCancelled(String input) {
+        return "cancel".equalsIgnoreCase(input == null ? "" : input.trim());
+    }
+
+    private void printCancellationMessage() {
+        System.out.println("\n  [!] Input cancelled. No changes were made.");
     }
 }
