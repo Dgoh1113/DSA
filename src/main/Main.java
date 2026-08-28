@@ -8,7 +8,6 @@ import adt.LinkedStack;
 import boundary.MainMenuUI;
 import control.FrontDeskController;
 import control.LoyaltyController;
-import control.PartnerController;
 import control.StandardBookingController;
 import control.VIPAllocationController;
 import control.VIPAllocationController.VIPReservation;
@@ -120,13 +119,6 @@ public class Main {
             partnerRegistry.add(p5);
             partnerRegistry.add(p6);
 
-            // Seed initial customer product referrals
-            PartnerController tempPartnerCtrl = new PartnerController(partnerRegistry, referralLog, masterRegistry);
-            tempPartnerCtrl.recordReferral(p1.getPartnerId(), guest1.getGuestId(), guest1.getName(), "PURCHASING", "Elmina Valley Semi-D Home Package", 850000.00, "2026-08-01");
-            tempPartnerCtrl.recordReferral(p2.getPartnerId(), guest2.getGuestId(), guest2.getName(), "PURCHASING", "Setia Alam Luxury Villa Package", 1200000.00, "2026-08-05");
-            tempPartnerCtrl.recordReferral(p4.getPartnerId(), guest2.getGuestId(), guest2.getName(), "RENOVATING", "Kitchen Extension & Flooring Work", 65000.00, "2026-08-08");
-            tempPartnerCtrl.recordReferral(p6.getPartnerId(), guest3.getGuestId(), guest3.getName(), "UPGRADING", "Master Bedroom & Living Room Design Upgrade", 45000.00, "2026-08-10");
-
             // Save seeded data to text files
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
@@ -140,7 +132,6 @@ public class Main {
         // 2. Create Controllers (Control layer)
         //    — inject the shared data structures
         // ============================
-        PartnerController         mod5_partner = new PartnerController(partnerRegistry, referralLog, masterRegistry);
         LinkedStack<entity.UndoAction> undoStack     = new LinkedStack<>();
         control.UndoController undoController        = new control.UndoController(undoStack);
 
@@ -158,7 +149,6 @@ public class Main {
         mod2.setUndoController(undoController);
         mod3.setUndoController(undoController);
         mod4.setUndoController(undoController);
-        mod5_partner.setUndoController(undoController);
 
         // Register auto-save shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
