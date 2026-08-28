@@ -2,8 +2,6 @@ package boundary;
 
 import adt.DoublyLinkedList;
 import control.FrontDeskController;
-import entity.BillingRecord;
-import entity.FrontDeskLog;
 import entity.Guest;
 import entity.Reservation;
 import entity.Room;
@@ -93,7 +91,7 @@ public class FrontDeskUI {
         utility.UIUtils.printSectionHeader("BILLING QUERY", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Query Billing Details ");
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Record Payment ");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " View Stored Front-Desk Files ");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " View Stored Front-Desk Files (Filter + MergeSort)");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -235,7 +233,7 @@ public class FrontDeskUI {
         utility.UIUtils.printSubHeader("MODULE 3 > CANCEL RESERVATION", utility.UIUtils.GREEN);
         DoublyLinkedList<Reservation> eligible = controller.getCancellableReservations();
         if (eligible.isEmpty()) {
-            System.out.println("No pending or confirmed bookings are currently available for cancellation.");
+            System.out.println("No allocated bookings are currently available for cancellation.");
             return;
         }
         displayReservationChoices("BOOKINGS AVAILABLE FOR CANCELLATION", eligible, true);
@@ -253,6 +251,11 @@ public class FrontDeskUI {
         if (!"PENDING".equals(res.getBookingStatus())
                 && !"CONFIRMED".equals(res.getBookingStatus())) {
             System.out.println("Cannot cancel. Current status: " + res.getBookingStatus());
+            return;
+        }
+        if ("PENDING".equals(res.getBookingStatus())
+                && (res.getAssignedRoomNo() == null || res.getAssignedRoomNo().trim().isEmpty())) {
+            System.out.println("Cannot cancel. This pending booking has not been allocated a room yet.");
             return;
         }
 
@@ -400,116 +403,63 @@ public class FrontDeskUI {
     }
 
     private void viewStoredFrontDeskRecords() {
-        utility.UIUtils.printSubHeader("MODULE 3 > FRONT-DESK RECORDED FILES", utility.UIUtils.GREEN);
-        System.out.println("1. View Check-In Records");
-        System.out.println("2. View Check-Out Records");
-        System.out.println("3. View Cancellation Records");
-        System.out.println("4. View Billing Records");
-        System.out.println("0. Back");
-        System.out.println(" ");
-        System.out.print("Enter your choice: ");
-        int choice = utility.UIUtils.safeReadInt(scanner);
+        utility.UIUtils.printSubHeader("MODULE 3 > STORED FRONT-DESK FILES", utility.UIUtils.GREEN);
+        String roomType = readReportChoice("Room type (ALL | STANDARD | DELUXE | SUITE): ",
+                "ALL|STANDARD|DELUXE|SUITE");
+        String recordStatus = readReportChoice(
+                "Status (ALL | CHECK_IN | CHECK_OUT | CANCELLED): ",
+                "ALL|CHECK_IN|CHECK_OUT|CANCELLED");
+        String paymentStatus = readReportChoice("Payment status (ALL | PAID | UNPAID): ",
+                "ALL|PAID|UNPAID");
 
-        switch (choice) {
-            case 1:
-                displayCheckInLog();
-                break;
-            case 2:
-                displayCheckOutLog();
-                break;
-            case 3:
-                displayCancellationLog();
-                break;
-            case 4:
-                displayBillingLog();
-                break;
-            default:
-                break;
+        FrontDeskController.StoredFrontDeskReport report =
+                controller.generateStoredFrontDeskReport(roomType, recordStatus, paymentStatus);
+        DoublyLinkedList<FrontDeskController.StoredFrontDeskRecord> records = report.getRecords();
+
+        System.out.println("\n+----------------------------------------------------------------------------------------------------------+");
+        System.out.println("                              STORED FRONT-DESK FILES REPORT");
+        System.out.println("+----------------------------------------------------------------------------------------------------------+");
+        System.out.println("  Filters: Room Type = " + report.getRoomType()
+                + " | Status = " + report.getRecordStatus()
+                + " | Payment = " + report.getPaymentStatus());
+        System.out.println("  Search: combined stored files  |  Sort: MergeSort by status, payment, confirmation");
+        System.out.println("+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
+        System.out.println("| No. | Confirmation | Guest          | Room   | Type      | Status     | Payment | Total      |");
+        System.out.println("+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
+        for (int i = 1; i <= records.getNumberOfEntries(); i++) {
+            FrontDeskController.StoredFrontDeskRecord record = records.getEntry(i);
+            System.out.printf("| %-3d | %-12s | %-14s | %-6s | %-9s | %-10s | %-7s | $%-9.2f |%n",
+                    i,
+                    emptyDash(record.getConfirmationNo()),
+                    truncate(record.getGuestName(), 14),
+                    emptyDash(record.getRoomNo()),
+                    emptyDash(record.getRoomType()),
+                    emptyDash(record.getRecordStatus()),
+                    emptyDash(record.getPaymentStatus()),
+                    record.getGrandTotal());
         }
+        if (records.isEmpty()) {
+            System.out.println("|                    No stored front-desk records match the selected filters.                   |");
+        }
+        System.out.println("+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
+        System.out.println("  Total Records : " + report.getTotalRecords()
+                + " | Check-In: " + report.getCheckInCount()
+                + " | Check-Out: " + report.getCheckOutCount()
+                + " | Cancelled: " + report.getCancelledCount());
+        System.out.println("  Payment       : Paid=" + report.getPaidCount()
+                + " | Unpaid=" + report.getUnpaidCount());
+        System.out.println("+----------------------------------------------------------------------------------------------------------+");
     }
 
-    private void displayCheckInLog() {
-        DoublyLinkedList<FrontDeskLog> logs = controller.getCheckInLog();
-        if (logs.isEmpty()) {
-            System.out.println("No check-in records stored in data/checkins.txt.");
-            return;
+    private String readReportChoice(String prompt, String permittedChoices) {
+        while (true) {
+            System.out.print("  " + prompt);
+            String choice = utility.UIUtils.safeReadLine(scanner).trim().toUpperCase();
+            if (("|" + permittedChoices + "|").contains("|" + choice + "|")) {
+                return choice;
+            }
+            System.out.println("  [!] Invalid option. Choose from: " + permittedChoices.replace("|", " | "));
         }
-        System.out.println("\nCHECK-IN RECORDS ");
-        System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
-        System.out.println("| No. | Confirmation   | Guest ID | Guest          | Room   | Type      | Check-In   |");
-        System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
-        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
-            FrontDeskLog log = logs.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-8s | %-14s | %-6s | %-9s | %-10s |%n",
-                    i, emptyDash(log.getConfirmationNo()), emptyDash(log.getGuestId()),
-                    truncate(log.getGuestName(), 14), emptyDash(log.getRoomNo()),
-                    emptyDash(log.getRoomType()), emptyDash(log.getCheckInDate()));
-        }
-        System.out.println("+-----+----------------+----------+----------------+--------+-----------+------------+");
-        System.out.println("Total records: " + logs.getNumberOfEntries());
-    }
-
-    private void displayCheckOutLog() {
-        DoublyLinkedList<FrontDeskLog> logs = controller.getCheckOutLog();
-        if (logs.isEmpty()) {
-            System.out.println("No check-out records stored in data/checkouts.txt.");
-            return;
-        }
-        System.out.println("\nCHECK-OUT RECORDS ");
-        System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
-        System.out.println("| No. | Confirmation   | Guest ID | Room   | Nights | Payment | Total      |");
-        System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
-        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
-            FrontDeskLog log = logs.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-8s | %-6s | %-6d | %-7s | $%-9.2f |%n",
-                    i, emptyDash(log.getConfirmationNo()), emptyDash(log.getGuestId()),
-                    emptyDash(log.getRoomNo()), log.getNights(),
-                    emptyDash(log.getPaymentStatus()), log.getGrandTotal());
-        }
-        System.out.println("+-----+----------------+----------+--------+--------+---------+------------+");
-        System.out.println("Total records: " + logs.getNumberOfEntries());
-    }
-
-    private void displayCancellationLog() {
-        DoublyLinkedList<FrontDeskLog> logs = controller.getCancellationLog();
-        if (logs.isEmpty()) {
-            System.out.println("No cancellation records stored in data/cancellations.txt.");
-            return;
-        }
-        System.out.println("\nCANCELLATION RECORDS ");
-        System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
-        System.out.println("| No. | Confirmation   | Guest ID | Guest          | Room   | Type      | Prev Status |");
-        System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
-        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
-            FrontDeskLog log = logs.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-8s | %-14s | %-6s | %-9s | %-11s |%n",
-                    i, emptyDash(log.getConfirmationNo()), emptyDash(log.getGuestId()),
-                    truncate(log.getGuestName(), 14), emptyDash(log.getRoomNo()),
-                    emptyDash(log.getRoomType()), emptyDash(log.getPreviousStatus()));
-        }
-        System.out.println("+-----+----------------+----------+----------------+--------+-----------+-------------+");
-        System.out.println("Total records: " + logs.getNumberOfEntries());
-    }
-
-    private void displayBillingLog() {
-        DoublyLinkedList<BillingRecord> bills = controller.getBillingLog();
-        if (bills.isEmpty()) {
-            System.out.println("No billing records stored in data/billing.txt.");
-            return;
-        }
-        System.out.println("\nBILLING RECORDS ");
-        System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
-        System.out.println("| No. | Confirmation   | Guest ID | Bill       | Payment    | Nights  | Total      |");
-        System.out.println("+-----+----------------+----------+------------+------------+---------+------------+");
-        for (int i = 1; i <= bills.getNumberOfEntries(); i++) {
-            BillingRecord bill = bills.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-8s | %-10s | %-10s | %-7d | $%-9.2f |%n",
-                    i, emptyDash(bill.getConfirmationNo()), emptyDash(bill.getGuestId()),
-                    emptyDash(bill.getBillStatus()), emptyDash(bill.getPaymentStatus()),
-                    bill.getNights(), bill.getGrandTotal());
-        }
-        System.out.println("+-----+----------------+----------+--------+------------+---------+------------+");
-        System.out.println("Total records: " + bills.getNumberOfEntries());
     }
 
     private String emptyDash(String value) {
