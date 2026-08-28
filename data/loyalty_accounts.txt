@@ -6,4 +6,4 @@ G1005|16500|DIAMOND|2027-08-19|Initial Seed Points;;;-500 pts (Redeemed: Room Up
 G1006|250|STANDARD|2027-08-16|+250 pts (DELUXE room stay)
 G1007|2000|SILVER|2027-08-16|+2000 pts (Stay: 4 nights @ $500.0/night);;;Tier upgrade: STANDARD -> SILVER
 G1008|12300|DIAMOND|2027-08-20|Initial Seed Points;;;-500 pts (Redeemed: Room Upgrade);;;+4500 pts (Stay: 9 nights @ $500.0/night);;;-200 pts (Redeemed: Late Checkout (Conf #10000027: 2026-08-21 -> 2026-08-22))
-G1009|10000|STANDARD||
+G1009|9100|PLATINUM||-200 pts (Redeemed: Late Checkout (Conf #10000028: 2026-09-14 -> 2026-09-15));;;Tier upgrade: STANDARD -> PLATINUM;;;-200 pts (Redeemed: Late Checkout (Conf #10000028: 2026-09-15 -> 2026-09-16));;;-500 pts (Redeemed: Room Upgrade (DELUXE -> SUITE))
