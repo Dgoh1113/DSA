@@ -293,6 +293,29 @@ public class VIPAllocationController {
         return summary;
     }
 
+    public DoublyLinkedList<Reservation> getVIPQueueStatusReport(
+            String minimumTier, String roomType, String bookingStatus, boolean ascending) {
+        int minimumTierWeight = getTierWeight(minimumTier);
+        DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            Guest guest = reservation == null ? null : reservation.getGuest();
+            if (guest == null || !guest.isVIP() || guest.getTierWeight() < minimumTierWeight) continue;
+            if (!"ALL".equals(roomType) && !roomType.equals(reservation.getRoomType())) continue;
+            if (!"ALL".equals(bookingStatus) && !bookingStatus.equals(reservation.getBookingStatus())) continue;
+            matches.add(reservation);
+        }
+        return SortAlgorithms.mergeSort(matches, (first, second) -> {
+            int priorityComparison = ascending
+                    ? Integer.compare(first.getPriorityScore(), second.getPriorityScore())
+                    : Integer.compare(second.getPriorityScore(), first.getPriorityScore());
+            return priorityComparison != 0
+                    ? priorityComparison
+                    : first.getConfirmationNo().compareTo(second.getConfirmationNo());
+        });
+    }
+
     public AllocationPerformanceReport generateAllocationPerformanceReport() {
         AllocationPerformanceReport report = new AllocationPerformanceReport();
         DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
@@ -331,6 +354,53 @@ public class VIPAllocationController {
         AllocationPerformanceReport report = new AllocationPerformanceReport(
                 minimumTier, roomType, bookingStatus, sortedMatches);
         return report;
+    }
+
+    public VIPAllocationEfficiencyReport generateVIPAllocationEfficiencyReport(
+            String minimumTier, String roomType, String bookingStatus,
+            String sortMetric, boolean ascending) {
+        int minimumTierWeight = getTierWeight(minimumTier);
+        DoublyLinkedList<VIPAllocationEfficiencyRow> rows = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation reservation = reservations.getEntry(i);
+            Guest guest = reservation == null ? null : reservation.getGuest();
+            if (guest == null || !guest.isVIP() || guest.getTierWeight() < minimumTierWeight) continue;
+            if (!"ALL".equals(roomType) && !roomType.equals(reservation.getRoomType())) continue;
+            if (!"ALL".equals(bookingStatus) && !bookingStatus.equals(reservation.getBookingStatus())) continue;
+
+            VIPAllocationEfficiencyRow row = null;
+            for (int j = 1; j <= rows.getNumberOfEntries(); j++) {
+                if (rows.getEntry(j).getRoomType().equals(reservation.getRoomType())) {
+                    row = rows.getEntry(j);
+                    break;
+                }
+            }
+            if (row == null) {
+                row = new VIPAllocationEfficiencyRow(reservation.getRoomType());
+                rows.add(row);
+            }
+            row.add(reservation);
+        }
+
+        DoublyLinkedList<VIPAllocationEfficiencyRow> sortedRows = SortAlgorithms.mergeSort(rows,
+            (first, second) -> {
+                int comparison;
+                if ("2".equals(sortMetric)) {
+                    comparison = Integer.compare(first.getRequests(), second.getRequests());
+                } else if ("3".equals(sortMetric)) {
+                    comparison = Integer.compare(first.getPending(), second.getPending());
+                } else if ("4".equals(sortMetric)) {
+                    comparison = Double.compare(first.getAveragePriority(), second.getAveragePriority());
+                } else {
+                    comparison = Double.compare(first.getAllocationRate(), second.getAllocationRate());
+                }
+                if (!ascending) comparison = -comparison;
+                return comparison != 0 ? comparison : first.getRoomType().compareTo(second.getRoomType());
+            });
+        return new VIPAllocationEfficiencyReport(minimumTier, roomType, bookingStatus,
+            sortMetric, sortedRows);
     }
 
     /**
@@ -455,6 +525,75 @@ public class VIPAllocationController {
             availableDeluxeRooms = deluxe;
             availableSuiteRooms = suite;
         }
+    }
+
+    public static class VIPAllocationEfficiencyRow {
+        private final String roomType;
+        private int requests;
+        private int allocated;
+        private int pending;
+        private int cancelled;
+        private int totalPriority;
+
+        private VIPAllocationEfficiencyRow(String roomType) {
+            this.roomType = roomType;
+        }
+
+        private void add(Reservation reservation) {
+            requests++;
+            totalPriority += reservation.getPriorityScore();
+            if ("CANCELLED".equals(reservation.getBookingStatus())) {
+                cancelled++;
+            } else if ("PENDING".equals(reservation.getBookingStatus())) {
+                pending++;
+            } else if (reservation.getAssignedRoomNo() != null
+                    || "CONFIRMED".equals(reservation.getBookingStatus())
+                    || "CHECKED_IN".equals(reservation.getBookingStatus())
+                    || "CHECKED_OUT".equals(reservation.getBookingStatus())) {
+                allocated++;
+            }
+        }
+
+        public String getRoomType() { return roomType; }
+        public int getRequests() { return requests; }
+        public int getAllocated() { return allocated; }
+        public int getPending() { return pending; }
+        public int getCancelled() { return cancelled; }
+        public double getAllocationRate() {
+            return requests == 0 ? 0.0 : allocated * 100.0 / requests;
+        }
+        public double getAveragePriority() {
+            return requests == 0 ? 0.0 : totalPriority * 1.0 / requests;
+        }
+    }
+
+    public static class VIPAllocationEfficiencyReport {
+        private final String minimumTier;
+        private final String roomType;
+        private final String bookingStatus;
+        private final String sortMetric;
+        private final DoublyLinkedList<VIPAllocationEfficiencyRow> rows;
+
+        private VIPAllocationEfficiencyReport(String minimumTier, String roomType,
+                                               String bookingStatus, String sortMetric,
+                                               DoublyLinkedList<VIPAllocationEfficiencyRow> rows) {
+            this.minimumTier = minimumTier;
+            this.roomType = roomType;
+            this.bookingStatus = bookingStatus;
+            this.sortMetric = sortMetric;
+            this.rows = rows;
+        }
+
+        public String getMinimumTier() { return minimumTier; }
+        public String getRoomType() { return roomType; }
+        public String getBookingStatus() { return bookingStatus; }
+        public String getSortMetric() {
+            if ("2".equals(sortMetric)) return "REQUESTS";
+            if ("3".equals(sortMetric)) return "PENDING";
+            if ("4".equals(sortMetric)) return "AVERAGE_PRIORITY";
+            return "ALLOCATION_RATE";
+        }
+        public DoublyLinkedList<VIPAllocationEfficiencyRow> getRows() { return rows; }
     }
 
     public static class AllocationPerformanceReport {
