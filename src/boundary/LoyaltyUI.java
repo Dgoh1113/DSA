@@ -84,8 +84,8 @@ public class LoyaltyUI {
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " View Transaction History");
 
         utility.UIUtils.printSectionHeader("MANAGEMENT & ANALYTICS REPORTS", utility.UIUtils.MAGENTA);
-        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Report: Top Point Earners (MergeSort)");
-        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Report: Expiring Points (QuickSort)");
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Report: Top Point Earners (MergeSort O(n log n))");
+        System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Report: Expiring Points (QuickSort O(n log n))");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Report: Members by Tier");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Report Generator (Search + Multi-Filter + MergeSort)");
         System.out.println("  " + utility.UIUtils.MAGENTA + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " View All Members");
@@ -323,7 +323,7 @@ public class LoyaltyUI {
                     i, acc.getMemberId(), acc.getTotalPoints(), acc.getTierStatus());
         }
         System.out.println("+------+----------------+-----------+----------+");
-        System.out.println("Sorted using MergeSort algorithm");
+        System.out.println("Sorted using MergeSort algorithm — O(n log n)");
     }
 
     private void expiringPointsReport() {
@@ -348,7 +348,7 @@ public class LoyaltyUI {
                     acc.getTierStatus(), acc.getPointsExpiryDate());
         }
         System.out.println("+------+----------------+-----------+----------+-------------+");
-        System.out.println("Sorted using QuickSort algorithm");
+        System.out.println("Sorted using QuickSort algorithm — O(n log n)");
     }
 
     private void tierReport() {
@@ -384,18 +384,20 @@ public class LoyaltyUI {
             return;
         }
 
-        System.out.println("+-----+----------------+-----------+----------+-------------+");
-        System.out.println("| No. | Member ID      | Points    | Tier     | Expiry Date |");
-        System.out.println("+-----+----------------+-----------+----------+-------------+");
+        System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
+        System.out.println("| No. | Member ID      | Member Name          | Points    | Tier     | Expiry Date |");
+        System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
 
         for (int i = 1; i <= all.getNumberOfEntries(); i++) {
             LoyaltyAccount acc = all.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-9d | %-8s | %-11s |%n",
-                    i, acc.getMemberId(), acc.getTotalPoints(),
+            Guest guest = controller.viewMemberGuest(acc.getMemberId());
+            String memberName = guest != null ? guest.getName() : "N/A";
+            System.out.printf("| %-3d | %-14s | %-20s | %-9d | %-8s | %-11s |%n",
+                    i, acc.getMemberId(), memberName, acc.getTotalPoints(),
                     acc.getTierStatus(),
                     acc.getPointsExpiryDate() != null ? acc.getPointsExpiryDate() : "N/A");
         }
-        System.out.println("+-----+----------------+-----------+----------+-------------+");
+        System.out.println("+-----+----------------+----------------------+-----------+----------+-------------+");
     }
 
     /** Builds a multi-criteria operational summary for management review. */
