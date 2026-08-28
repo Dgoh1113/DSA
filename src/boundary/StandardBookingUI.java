@@ -137,18 +137,8 @@ public class StandardBookingUI {
         while (step >= 0 && step <= 2) {
             switch (step) {
                 case 0: {
-                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
-                    utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 1/3 - Preferred Room   ", roomType);
+                    utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 1/3 - Check-In (YYYY-MM-DD) ", checkIn);
                     if (res.isGoBack()) return false;
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    roomType = res.getValue();
-                    step++;
-                    break;
-                }
-                case 1: {
-                    utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 2/3 - Check-In (YYYY-MM-DD) ", checkIn);
-                    if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     String val = res.getValue();
@@ -156,22 +146,32 @@ public class StandardBookingUI {
                         java.time.LocalDate date = java.time.LocalDate.parse(val);
                         if (date.isBefore(java.time.LocalDate.now())) {
                             System.out.println(utility.UIUtils.RED + "  [!] ERROR: Check-in date cannot be in the past (before " + java.time.LocalDate.now() + ")." + utility.UIUtils.RESET);
-                            break; // Repeat Step 1
+                            break; // Repeat Step 0
                         }
                     } catch (Exception e) {
                         System.out.println(utility.UIUtils.RED + "  [!] ERROR: Invalid date format." + utility.UIUtils.RESET);
-                        break; // Repeat Step 1
+                        break; // Repeat Step 0
                     }
                     checkIn = val;
                     step++;
                     break;
                 }
-                case 2: {
-                    utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 3/3 - Check-Out Date   ", checkIn, checkOut);
+                case 1: {
+                    utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 2/3 - Check-Out Date   ", checkIn, checkOut);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     checkOut = res.getValue();
+                    step++;
+                    break;
+                }
+                case 2: {
+                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+                    utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 3/3 - Preferred Room   ", roomType);
+                    if (res.isGoBack()) { step--; break; }
+                    if (res.isQuitToMain()) return true;
+                    if (res.isCancel()) return false;
+                    roomType = res.getValue();
                     step++;
                     break;
                 }
@@ -469,13 +469,89 @@ public class StandardBookingUI {
     private void generateRevenueReport() {
         utility.UIUtils.printSubHeader("REVENUE ANALYSIS REPORT", utility.UIUtils.YELLOW);
         
-        System.out.print("  Filter by Room Type (STANDARD/DELUXE/SUITE or ALL): ");
-        String roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
-        if (roomType.isEmpty()) roomType = "ALL";
+        System.out.println("  Select Room Type(s) to filter by:");
+        System.out.println("    1. STANDARD");
+        System.out.println("    2. DELUXE");
+        System.out.println("    3. SUITE");
+        System.out.println("    4. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 4 for ALL): ");
+        String roomInput = utility.UIUtils.safeReadLine(scanner).trim();
         
-        System.out.print("  Filter by Booking Status (PENDING/CONFIRMED/CANCELLED/CHECKED_IN/CHECKED_OUT or ALL): ");
-        String status = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
-        if (status.isEmpty()) status = "ALL";
+        DoublyLinkedList<String> roomFilters = new DoublyLinkedList<>();
+        if (roomInput.isEmpty()) {
+            roomFilters.add("ALL");
+        } else {
+            String[] parts = roomInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1":
+                        roomFilters.add("STANDARD");
+                        break;
+                    case "2":
+                        roomFilters.add("DELUXE");
+                        break;
+                    case "3":
+                        roomFilters.add("SUITE");
+                        break;
+                    case "4":
+                    default:
+                        if (choice.equals("4")) {
+                            roomFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (roomFilters.isEmpty()) {
+            roomFilters.add("ALL");
+        }
+        
+        System.out.println("  Select Booking Status(es) to filter by:");
+        System.out.println("    1. PENDING");
+        System.out.println("    2. CONFIRMED");
+        System.out.println("    3. CANCELLED");
+        System.out.println("    4. CHECKED_IN");
+        System.out.println("    5. CHECKED_OUT");
+        System.out.println("    6. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 6 for ALL): ");
+        String statusInput = utility.UIUtils.safeReadLine(scanner).trim();
+        
+        DoublyLinkedList<String> statusFilters = new DoublyLinkedList<>();
+        if (statusInput.isEmpty()) {
+            statusFilters.add("ALL");
+        } else {
+            String[] parts = statusInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1":
+                        statusFilters.add("PENDING");
+                        break;
+                    case "2":
+                        statusFilters.add("CONFIRMED");
+                        break;
+                    case "3":
+                        statusFilters.add("CANCELLED");
+                        break;
+                    case "4":
+                        statusFilters.add("CHECKED_IN");
+                        break;
+                    case "5":
+                        statusFilters.add("CHECKED_OUT");
+                        break;
+                    case "6":
+                    default:
+                        if (choice.equals("6")) {
+                            statusFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (statusFilters.isEmpty()) {
+            statusFilters.add("ALL");
+        }
         
         System.out.print("  Filter by Minimum Duration of Stay (days): ");
         int minDuration = 0;
@@ -488,10 +564,10 @@ public class StandardBookingUI {
             System.out.println("  [!] Invalid number. Minimum duration set to 0.");
         }
         
-        StandardBookingController.StandardRevenueReport report = controller.generateRevenueReport(roomType, status, minDuration);
+        StandardBookingController.StandardRevenueReport report = controller.generateRevenueReport(roomFilters, statusFilters, minDuration);
         
         System.out.println("\n============================================================================================");
-        System.out.println("                    STANDARD RESERVATIONS REVENUE ANALYSIS REPORT");
+        System.out.println("                         RESERVATIONS REVENUE ANALYSIS REPORT");
         System.out.println("============================================================================================");
         System.out.println("  Filters Applied:");
         System.out.println("  - Room Type      : " + report.getRoomTypeFilter());
@@ -539,11 +615,45 @@ public class StandardBookingUI {
     private void generateQueuePerformanceReport() {
         utility.UIUtils.printSubHeader("QUEUE PERFORMANCE REPORT", utility.UIUtils.YELLOW);
         
-        System.out.print("  Filter by Room Type (STANDARD/DELUXE/SUITE or ALL): ");
-        String roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
-        if (roomType.isEmpty()) roomType = "ALL";
+        System.out.println("  Select Room Type(s) to filter by:");
+        System.out.println("    1. STANDARD");
+        System.out.println("    2. DELUXE");
+        System.out.println("    3. SUITE");
+        System.out.println("    4. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 4 for ALL): ");
+        String roomInput = utility.UIUtils.safeReadLine(scanner).trim();
         
-        StandardBookingController.QueuePerformanceReport report = controller.generateQueuePerformanceReport(roomType);
+        DoublyLinkedList<String> roomFilters = new DoublyLinkedList<>();
+        if (roomInput.isEmpty()) {
+            roomFilters.add("ALL");
+        } else {
+            String[] parts = roomInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1":
+                        roomFilters.add("STANDARD");
+                        break;
+                    case "2":
+                        roomFilters.add("DELUXE");
+                        break;
+                    case "3":
+                        roomFilters.add("SUITE");
+                        break;
+                    case "4":
+                    default:
+                        if (choice.equals("4")) {
+                            roomFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (roomFilters.isEmpty()) {
+            roomFilters.add("ALL");
+        }
+        
+        StandardBookingController.QueuePerformanceReport report = controller.generateQueuePerformanceReport(roomFilters);
         
         System.out.println("\n=============================================================================");
         System.out.println("                    STANDARD QUEUE PERFORMANCE & ROOM SHORTAGE REPORT");

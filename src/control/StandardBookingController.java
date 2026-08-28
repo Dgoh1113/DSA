@@ -64,76 +64,6 @@ public class StandardBookingController {
         return null;
     }
 
-    /**
-     * Registers a walk-in guest and creates a PENDING reservation.
-     * The guest is added to the guest registry and the reservation
-     * is enqueued into the standard FIFO queue.
-     *
-     * @return The created Reservation with a generated confirmation number.
-     */
-    public Reservation registerWalkIn(String name, String icPassport, String contactNo,
-                                       String email, String roomType,
-                                       String checkInDate, String checkOutDate) {
-        // Reuse the existing guest and loyalty identity when the phone is registered.
-        Guest guest = findGuestByContactNo(contactNo);
-        if (guest == null) {
-            guest = new Guest(name, icPassport, contactNo, email);
-            guestRegistry.add(guest);
-        }
-
-        // Create reservation
-        Reservation reservation = new Reservation(guest.getGuestId(), roomType, checkInDate, checkOutDate);
-        reservation.setGuest(guest);
-
-        // Find if there is an available room for these dates
-        Room assignedRoom = findAvailableRoomForDates(roomType, checkInDate, checkOutDate);
-        if (assignedRoom != null) {
-            reservation.setAssignedRoomNo(assignedRoom.getRoomNo());
-            reservation.setBookingStatus("CONFIRMED");
-            try {
-                if (LocalDate.parse(checkInDate).equals(LocalDate.now())) {
-                    assignedRoom.setStatus("OCCUPIED");
-                }
-            } catch (Exception e) {}
-        } else {
-            reservation.setBookingStatus("PENDING");
-            // Enqueue into standard queue (FIFO) only if waitlisted
-            standardQueue.enqueue(reservation);
-        }
-
-        // Insert into BST for front-desk search
-        searchTree.insert(reservation);
-
-        // Record Undo Action
-        final Room finalRoom = assignedRoom;
-        if (undoController != null) {
-            undoController.recordAction(
-                "WALK_IN_REGISTRATION",
-                "Module 1: Standard Booking",
-                "Register Walk-In: " + name + " (Conf #" + reservation.getConfirmationNo() + ")",
-                () -> {
-                    reservation.setBookingStatus("CANCELLED");
-                    if (finalRoom != null && "OCCUPIED".equals(finalRoom.getStatus())) {
-                        finalRoom.setStatus("AVAILABLE");
-                    }
-                    searchTree.delete(reservation);
-                }
-            );
-        }
-
-        return reservation;
-    }
-
-    /** Creates a standard booking for an existing, non-VIP guest profile. */
-    public Reservation registerBookingForGuest(Guest guest, String roomType,
-                                               String checkInDate, String checkOutDate) {
-        if (guest == null) return null;
-        Guest registeredGuest = findGuestById(guest.getGuestId());
-        if (registeredGuest == null || registeredGuest.isVIP()) return null;
-        return registerWalkIn(registeredGuest.getName(), registeredGuest.getIcPassport(),
-                registeredGuest.getContactNo(), registeredGuest.getEmail(), roomType,
-                checkInDate, checkOutDate);
-    }
 
     /**
      * Processes the next booking in the standard queue.
@@ -208,6 +138,39 @@ public class StandardBookingController {
         Guest guest = findGuestByContactNo(contactNo);
         if (guest == null || loyaltyController == null) return null;
         return loyaltyController.viewMemberProfile(guest.getGuestId());
+    }
+
+    /**
+     * Registers a booking for an existing guest and inserts it into the standard FIFO waitlist.
+     */
+    public Reservation registerBookingForGuest(Guest guest, String roomType,
+                                               String checkInDate, String checkOutDate) {
+        if (guest == null) return null;
+        
+        Reservation reservation = new Reservation(guest.getGuestId(), roomType, checkInDate, checkOutDate);
+        reservation.setGuest(guest);
+        reservation.setBookingStatus("PENDING");
+
+        // Enqueue into standard queue (FIFO)
+        standardQueue.enqueue(reservation);
+
+        // Insert into BST for front-desk search
+        searchTree.insert(reservation);
+
+        // Record Undo Action
+        if (undoController != null) {
+            undoController.recordAction(
+                "CREATE_BOOKING",
+                "Module 1: Standard Booking",
+                "Create Booking for: " + guest.getName() + " (Conf #" + reservation.getConfirmationNo() + ")",
+                () -> {
+                    reservation.setBookingStatus("CANCELLED");
+                    searchTree.delete(reservation);
+                }
+            );
+        }
+
+        return reservation;
     }
 
     /** Registers a new STANDARD member without creating a room reservation. */
@@ -512,21 +475,58 @@ public class StandardBookingController {
     /**
      * Generates a Revenue Analysis report for standard bookings.
      */
-    public StandardRevenueReport generateRevenueReport(String roomType, String bookingStatus, int minDuration) {
+    public StandardRevenueReport generateRevenueReport(DoublyLinkedList<String> roomTypes, DoublyLinkedList<String> bookingStatuses, int minDuration) {
         DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> allReservations = searchTree.inOrderTraversal();
 
+        boolean allowAllRooms = roomTypes.isEmpty();
+        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
+                allowAllRooms = true;
+                break;
+            }
+        }
+
+        boolean allowAllStatuses = bookingStatuses.isEmpty();
+        for (int i = 1; i <= bookingStatuses.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(bookingStatuses.getEntry(i))) {
+                allowAllStatuses = true;
+                break;
+            }
+        }
+
         for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
             Reservation res = allReservations.getEntry(i);
-            if (res == null || res.getPriorityScore() > 0) {
-                continue; // Skip VIP reservations
-            }
-            if (!"ALL".equals(roomType) && !roomType.equals(res.getRoomType())) {
+            if (res == null) {
                 continue;
             }
-            if (!"ALL".equals(bookingStatus) && !bookingStatus.equals(res.getBookingStatus())) {
-                continue;
+            
+            if (!allowAllRooms) {
+                boolean roomMatched = false;
+                for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
+                    if (roomTypes.getEntry(j).equalsIgnoreCase(res.getRoomType())) {
+                        roomMatched = true;
+                        break;
+                    }
+                }
+                if (!roomMatched) {
+                    continue;
+                }
             }
+            
+            if (!allowAllStatuses) {
+                boolean statusMatched = false;
+                for (int j = 1; j <= bookingStatuses.getNumberOfEntries(); j++) {
+                    if (bookingStatuses.getEntry(j).equalsIgnoreCase(res.getBookingStatus())) {
+                        statusMatched = true;
+                        break;
+                    }
+                }
+                if (!statusMatched) {
+                    continue;
+                }
+            }
+
             try {
                 long duration = LocalDate.parse(res.getCheckOutDate()).toEpochDay() - LocalDate.parse(res.getCheckInDate()).toEpochDay();
                 if (duration < minDuration) {
@@ -549,15 +549,43 @@ public class StandardBookingController {
             }
         });
 
-        return new StandardRevenueReport(roomType, bookingStatus, minDuration, sorted);
+        StringBuilder roomSb = new StringBuilder();
+        if (allowAllRooms) {
+            roomSb.append("ALL");
+        } else {
+            for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+                if (i > 1) roomSb.append(", ");
+                roomSb.append(roomTypes.getEntry(i));
+            }
+        }
+
+        StringBuilder statusSb = new StringBuilder();
+        if (allowAllStatuses) {
+            statusSb.append("ALL");
+        } else {
+            for (int i = 1; i <= bookingStatuses.getNumberOfEntries(); i++) {
+                if (i > 1) statusSb.append(", ");
+                statusSb.append(bookingStatuses.getEntry(i));
+            }
+        }
+
+        return new StandardRevenueReport(roomSb.toString(), statusSb.toString(), minDuration, sorted);
     }
 
     /**
      * Generates a Queue Performance & Room Shortage report.
      */
-    public QueuePerformanceReport generateQueuePerformanceReport(String roomType) {
+    public QueuePerformanceReport generateQueuePerformanceReport(DoublyLinkedList<String> roomTypes) {
         DoublyLinkedList<Reservation> pending = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> allQueue = standardQueue.toList();
+
+        boolean allowAllRooms = roomTypes.isEmpty();
+        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
+                allowAllRooms = true;
+                break;
+            }
+        }
 
         LocalDate today = LocalDate.now();
         for (int i = 1; i <= allQueue.getNumberOfEntries(); i++) {
@@ -570,7 +598,17 @@ public class StandardBookingController {
                     }
                 } catch (Exception e) {}
                 
-                if ("ALL".equals(roomType) || roomType.equals(res.getRoomType())) {
+                boolean roomMatched = allowAllRooms;
+                if (!allowAllRooms) {
+                    for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
+                        if (roomTypes.getEntry(j).equalsIgnoreCase(res.getRoomType())) {
+                            roomMatched = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (roomMatched) {
                     pending.add(res);
                 }
             }
@@ -586,13 +624,32 @@ public class StandardBookingController {
         for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
             Room r = roomInventory.getEntry(i);
             if (r != null && "AVAILABLE".equals(r.getStatus())) {
-                if ("ALL".equals(roomType) || roomType.equals(r.getRoomType())) {
+                boolean roomMatched = allowAllRooms;
+                if (!allowAllRooms) {
+                    for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
+                        if (roomTypes.getEntry(j).equalsIgnoreCase(r.getRoomType())) {
+                            roomMatched = true;
+                            break;
+                        }
+                    }
+                }
+                if (roomMatched) {
                     availCount++;
                 }
             }
         }
 
-        return new QueuePerformanceReport(roomType, sorted, availCount);
+        StringBuilder roomSb = new StringBuilder();
+        if (allowAllRooms) {
+            roomSb.append("ALL");
+        } else {
+            for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+                if (i > 1) roomSb.append(", ");
+                roomSb.append(roomTypes.getEntry(i));
+            }
+        }
+
+        return new QueuePerformanceReport(roomSb.toString(), sorted, availCount);
     }
 
     // ========================================================================

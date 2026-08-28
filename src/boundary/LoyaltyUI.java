@@ -406,26 +406,59 @@ public class LoyaltyUI {
 
     private void tierReport() {
         utility.UIUtils.printSubHeader("MODULE 4 > REPORT: MEMBERS BY TIER", utility.UIUtils.MAGENTA);
-        System.out.println("Select Tier: STANDARD | SILVER | GOLD | PLATINUM | DIAMOND");
-        String tier = utility.ValidationUtils.getValidLoyaltyTier(scanner, "Tier: ");
+        
+        System.out.println("  Select Loyalty Tier(s) to filter by:");
+        System.out.println("    1. STANDARD");
+        System.out.println("    2. SILVER");
+        System.out.println("    3. GOLD");
+        System.out.println("    4. PLATINUM");
+        System.out.println("    5. DIAMOND");
+        System.out.println("    6. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 6 for ALL): ");
+        String tierInput = utility.UIUtils.safeReadLine(scanner).trim();
+        DoublyLinkedList<String> tierFilters = new DoublyLinkedList<>();
+        if (tierInput.isEmpty()) {
+            tierFilters.add("ALL");
+        } else {
+            String[] parts = tierInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1": tierFilters.add("STANDARD"); break;
+                    case "2": tierFilters.add("SILVER"); break;
+                    case "3": tierFilters.add("GOLD"); break;
+                    case "4": tierFilters.add("PLATINUM"); break;
+                    case "5": tierFilters.add("DIAMOND"); break;
+                    case "6":
+                    default:
+                        if (choice.equals("6")) {
+                            tierFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (tierFilters.isEmpty()) {
+            tierFilters.add("ALL");
+        }
 
-        DoublyLinkedList<LoyaltyAccount> result = controller.generateTierReport(tier);
+        DoublyLinkedList<LoyaltyAccount> result = controller.generateTierReport(tierFilters);
         if (result.isEmpty()) {
-            System.out.println("No members found in " + tier + " tier.");
+            System.out.println("No members found matching the selected filters.");
             return;
         }
 
-        System.out.println("+------+----------------+-----------+-------------+");
-        System.out.println("| No.  | Member ID      | Points    | Expiry Date |");
-        System.out.println("+------+----------------+-----------+-------------+");
+        System.out.println("+------+----------------+-----------+-----------+-------------+");
+        System.out.println("| No.  | Member ID      | Tier      | Points    | Expiry Date |");
+        System.out.println("+------+----------------+-----------+-----------+-------------+");
 
         for (int i = 1; i <= result.getNumberOfEntries(); i++) {
             LoyaltyAccount acc = result.getEntry(i);
-            System.out.printf("| %-4d | %-14s | %-9d | %-11s |%n",
-                    i, acc.getMemberId(), acc.getTotalPoints(),
+            System.out.printf("| %-4d | %-14s | %-9s | %-9d | %-11s |%n",
+                    i, acc.getMemberId(), acc.getTierStatus(), acc.getTotalPoints(),
                     acc.getPointsExpiryDate() != null ? acc.getPointsExpiryDate() : "N/A");
         }
-        System.out.println("+------+----------------+-----------+-------------+");
+        System.out.println("+------+----------------+-----------+-----------+-------------+");
     }
 
     private void viewAllMembers() {
@@ -458,30 +491,62 @@ public class LoyaltyUI {
         utility.UIUtils.printSubHeader("MODULE 4 > LOYALTY REPORT GENERATOR", utility.UIUtils.MAGENTA);
         System.out.println("Create a ranked loyalty summary using member search and multiple filters.");
 
-        String tierFilter;
-        do {
-            System.out.print("Tier filter (ALL / STANDARD / SILVER / GOLD / PLATINUM / DIAMOND): ");
-            tierFilter = utility.UIUtils.safeReadLine(scanner).toUpperCase();
-            if (tierFilter.isEmpty()) tierFilter = "ALL";
-        } while (!"ALL".equals(tierFilter) && !"STANDARD".equals(tierFilter)
-                && !"SILVER".equals(tierFilter) && !"GOLD".equals(tierFilter)
-                && !"PLATINUM".equals(tierFilter) && !"DIAMOND".equals(tierFilter));
+        System.out.println("  Select Loyalty Tier(s) to filter by:");
+        System.out.println("    1. STANDARD");
+        System.out.println("    2. SILVER");
+        System.out.println("    3. GOLD");
+        System.out.println("    4. PLATINUM");
+        System.out.println("    5. DIAMOND");
+        System.out.println("    6. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 6 for ALL): ");
+        String tierInput = utility.UIUtils.safeReadLine(scanner).trim();
+        DoublyLinkedList<String> tierFilters = new DoublyLinkedList<>();
+        if (tierInput.isEmpty()) {
+            tierFilters.add("ALL");
+        } else {
+            String[] parts = tierInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1": tierFilters.add("STANDARD"); break;
+                    case "2": tierFilters.add("SILVER"); break;
+                    case "3": tierFilters.add("GOLD"); break;
+                    case "4": tierFilters.add("PLATINUM"); break;
+                    case "5": tierFilters.add("DIAMOND"); break;
+                    case "6":
+                    default:
+                        if (choice.equals("6")) {
+                            tierFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (tierFilters.isEmpty()) {
+            tierFilters.add("ALL");
+        }
 
-        System.out.print("Minimum points (0 for no minimum): ");
+        System.out.print("  Minimum points (0 for no minimum): ");
         int minimumPoints = Math.max(0, utility.UIUtils.safeReadInt(scanner));
-        System.out.print("Points expiry window in days (0 to ignore expiry): ");
+        System.out.print("  Points expiry window in days (0 to ignore expiry): ");
         int expiryWindow = Math.max(0, utility.UIUtils.safeReadInt(scanner));
-        System.out.print("Search by member ID or member name (press ENTER for all): ");
+        System.out.print("  Search by member ID or member name (press ENTER for all): ");
         String memberSearch = utility.UIUtils.safeReadLine(scanner);
 
         DoublyLinkedList<LoyaltyController.ManagementReportEntry> report =
                 controller.generateManagementReport(
-                        tierFilter, minimumPoints, expiryWindow, memberSearch);
+                        tierFilters, minimumPoints, expiryWindow, memberSearch);
+
+        StringBuilder tierFilterSb = new StringBuilder();
+        for (int i = 1; i <= tierFilters.getNumberOfEntries(); i++) {
+            if (i > 1) tierFilterSb.append(", ");
+            tierFilterSb.append(tierFilters.getEntry(i));
+        }
 
         System.out.println("\n+============================================================================+ ");
         System.out.println("                 LOYALTY & REWARDS MANAGEMENT REPORT");
         System.out.println("+============================================================================+");
-        System.out.println("  Tier filter     : " + tierFilter);
+        System.out.println("  Tier filter     : " + tierFilterSb.toString());
         System.out.println("  Minimum points  : " + minimumPoints);
         System.out.println("  Expiry filter   : " + (expiryWindow == 0 ? "Not applied"
                 : "Expires within " + expiryWindow + " days"));
