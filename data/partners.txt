@@ -1,6 +1,0 @@
-P1000|Sime Darby Property|PROPERTY_DEVELOPER|Dato' Ahmad|03-78448000|info@simedarbyproperty.com|Luxury Township & Residential Purchasing|1|850000.0
-P1001|SP Setia|PROPERTY_DEVELOPER|Tan Sri Liew|03-33448888|contact@spsetia.com|Eco-Sanctuary Property & Modern Living Packages|1|1200000.0
-P1002|Sunway Property|PROPERTY_DEVELOPER|Jeffrey Cheah|03-56398888|enquiry@sunwayproperty.com|Integrated Resort & City Living Homes|0|0.0
-P1003|Apex Renovation Contractors|RENOVATION_CONTRACTOR|Eng Seng|012-8889900|sales@apexrenovation.com|Full House Renovation, Extensions & Wet Works|1|65000.0
-P1004|VoltCraft Electrical Contractors|ELECTRICAL_CONTRACTOR|David Wong|016-7776655|support@voltcraft.my|Smart Home Rewiring, DB Box & Solar Fittings|0|0.0
-P1005|Elegance Interior Design|INTERIOR_DESIGN_FIRM|Sophia Chen|019-3332211|creative@eleganceid.com|Bespoke Interior Design & Custom Furniture Upgrades|1|45000.0

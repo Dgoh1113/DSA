@@ -439,23 +439,23 @@ public class LoyaltyUI {
         }
         String tier = tierResult.getValue();
 
-        DoublyLinkedList<LoyaltyAccount> result = controller.generateTierReport(tier);
+        DoublyLinkedList<LoyaltyAccount> result = controller.generateTierReport(tierFilters);
         if (result.isEmpty()) {
-            System.out.println("No members found in " + tier + " tier.");
+            System.out.println("No members found matching the selected filters.");
             return;
         }
 
-        System.out.println("+------+----------------+-----------+-------------+");
-        System.out.println("| No.  | Member ID      | Points    | Expiry Date |");
-        System.out.println("+------+----------------+-----------+-------------+");
+        System.out.println("+------+----------------+-----------+-----------+-------------+");
+        System.out.println("| No.  | Member ID      | Tier      | Points    | Expiry Date |");
+        System.out.println("+------+----------------+-----------+-----------+-------------+");
 
         for (int i = 1; i <= result.getNumberOfEntries(); i++) {
             LoyaltyAccount acc = result.getEntry(i);
-            System.out.printf("| %-4d | %-14s | %-9d | %-11s |%n",
-                    i, acc.getMemberId(), acc.getTotalPoints(),
+            System.out.printf("| %-4d | %-14s | %-9s | %-9d | %-11s |%n",
+                    i, acc.getMemberId(), acc.getTierStatus(), acc.getTotalPoints(),
                     acc.getPointsExpiryDate() != null ? acc.getPointsExpiryDate() : "N/A");
         }
-        System.out.println("+------+----------------+-----------+-------------+");
+        System.out.println("+------+----------------+-----------+-----------+-------------+");
     }
 
     private void viewAllMembers() {
@@ -521,12 +521,18 @@ public class LoyaltyUI {
 
         DoublyLinkedList<LoyaltyController.ManagementReportEntry> report =
                 controller.generateManagementReport(
-                        tierFilter, minimumPoints, expiryWindow, memberSearch);
+                        tierFilters, minimumPoints, expiryWindow, memberSearch);
+
+        StringBuilder tierFilterSb = new StringBuilder();
+        for (int i = 1; i <= tierFilters.getNumberOfEntries(); i++) {
+            if (i > 1) tierFilterSb.append(", ");
+            tierFilterSb.append(tierFilters.getEntry(i));
+        }
 
         System.out.println("\n+============================================================================+ ");
         System.out.println("                 LOYALTY & REWARDS MANAGEMENT REPORT");
         System.out.println("+============================================================================+");
-        System.out.println("  Tier filter     : " + tierFilter);
+        System.out.println("  Tier filter     : " + tierFilterSb.toString());
         System.out.println("  Minimum points  : " + minimumPoints);
         System.out.println("  Expiry filter   : " + (expiryWindow == 0 ? "Not applied"
                 : "Expires within " + expiryWindow + " days"));
