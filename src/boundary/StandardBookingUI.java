@@ -15,15 +15,10 @@ public class StandardBookingUI {
 
     private StandardBookingController controller;
     private Scanner scanner;
-    private Guest authenticatedGuest;
 
     public StandardBookingUI(StandardBookingController controller, Scanner scanner) {
         this.controller = controller;
         this.scanner = scanner;
-    }
-
-    public void setAuthenticatedGuest(Guest authenticatedGuest) {
-        this.authenticatedGuest = authenticatedGuest;
     }
 
     public void show() {
@@ -82,7 +77,7 @@ public class StandardBookingUI {
 
     private void displayMenu() {
         utility.UIUtils.printSectionHeader("REGISTRATION & PROCESSING", utility.UIUtils.CYAN);
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Register Walk-In Guest");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Create Standard Booking (Guest ID)");
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " Process Next Booking (Assign Room)");
 
         utility.UIUtils.printSectionHeader("REGISTRATION MANAGEMENT", utility.UIUtils.CYAN);
@@ -104,59 +99,56 @@ public class StandardBookingUI {
     }
 
     private boolean registerWalkIn() {
-        utility.UIUtils.printSubHeader("MODULE 1 > REGISTER WALK-IN GUEST", utility.UIUtils.CYAN);
+        utility.UIUtils.printSubHeader("MODULE 1 > CREATE STANDARD BOOKING", utility.UIUtils.CYAN);
         System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type 'b' to go BACK | Type '0' to QUIT TO MAIN MENU | Type 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
 
-        String name = "";
-        String icPassport = "";
-        String contactNo = "";
-        String email = "";
         String roomType = "";
         String checkIn = "";
         String checkOut = "";
 
-        Guest existingGuest;
-        if (authenticatedGuest != null) {
-            existingGuest = authenticatedGuest;
-            contactNo = authenticatedGuest.getContactNo();
-        } else {
-            utility.StepResult phoneResult = utility.ValidationUtils.readValidContactNoStep(
-                    scanner, "Phone Number (loyalty lookup) ", contactNo);
-            if (phoneResult.isGoBack() || phoneResult.isCancel()) return false;
-            if (phoneResult.isQuitToMain()) return true;
-            contactNo = phoneResult.getValue();
-            existingGuest = controller.findGuestByContactNo(contactNo);
-        }
-        boolean returningGuest = existingGuest != null;
-        if (returningGuest) {
-            name = existingGuest.getName();
-            icPassport = existingGuest.getIcPassport();
-            email = existingGuest.getEmail();
-            contactNo = existingGuest.getContactNo();
 
-            System.out.println("\n  Registered phone number found. Existing details loaded:");
-            System.out.println("  Guest ID        : " + existingGuest.getGuestId());
-            System.out.println("  Name            : " + existingGuest.getName());
-            System.out.println("  IC / Passport   : " + existingGuest.getIcPassport());
-            System.out.println("  Contact Number  : " + existingGuest.getContactNo());
-            System.out.println("  Email           : " + existingGuest.getEmail());
-            System.out.println("  Loyalty Tier    : " + existingGuest.getLoyaltyTier());
-            entity.LoyaltyAccount loyaltyAccount =
-                    controller.findLoyaltyAccountByContactNo(contactNo);
-            System.out.println("  Loyalty Points  : "
-                    + (loyaltyAccount == null ? 0 : loyaltyAccount.getTotalPoints()));
-            System.out.println("\n  Only the room and stay dates are required.\n");
-        } else {
-            System.out.println("\n  Phone number is not registered. Please enter the new guest details.\n");
+        utility.StepResult guestIdResult = utility.ValidationUtils.readValidStringStep(
+                scanner, "Guest ID", "", false);
+        if (guestIdResult.isQuitToMain()) return true;
+        if (guestIdResult.isGoBack() || guestIdResult.isCancel()) return false;
+
+        Guest guest = controller.findGuestById(guestIdResult.getValue());
+        if (guest == null) {
+            System.out.println("\n  [!] Guest ID not found. Please register the guest before creating a booking.");
+            return false;
         }
+        if (guest.isVIP()) {
+            System.out.println("\n  [!] " + guest.getName() + " is VIP eligible. Create this booking through Module 2.");
+            return false;
+        }
+
+        System.out.println("\n  Guest details loaded:");
+        System.out.println("  Guest ID        : " + guest.getGuestId());
+        System.out.println("  Name            : " + guest.getName());
+        System.out.println("  IC / Passport   : " + guest.getIcPassport());
+        System.out.println("  Contact Number  : " + guest.getContactNo());
+        System.out.println("  Email           : " + guest.getEmail());
+        System.out.println("  Loyalty Tier    : " + guest.getLoyaltyTier());
+        System.out.println("\n  Only the room and stay dates are required.\n");
 
         printRoomCatalogueTable();
 
         int step = 0;
-        while (step >= 0 && step <= 5) {
+        while (step >= 0 && step <= 2) {
             switch (step) {
                 case 0: {
-                    utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 2/7 - Check-In (YYYY-MM-DD) ", checkIn);
+                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+                    utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 1/3 - Preferred Room   ", roomType);
+                    if (res.isGoBack()) return false;
+                    if (res.isQuitToMain()) return true;
+                    if (res.isCancel()) return false;
+                    roomType = res.getValue();
+                    step++;
+                    break;
+                }
+                case 1: {
+                    utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 2/3 - Check-In (YYYY-MM-DD) ", checkIn);
+                    if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     String val = res.getValue();
@@ -164,18 +156,18 @@ public class StandardBookingUI {
                         java.time.LocalDate date = java.time.LocalDate.parse(val);
                         if (date.isBefore(java.time.LocalDate.now())) {
                             System.out.println(utility.UIUtils.RED + "  [!] ERROR: Check-in date cannot be in the past (before " + java.time.LocalDate.now() + ")." + utility.UIUtils.RESET);
-                            break; // Repeat Step 0
+                            break; // Repeat Step 1
                         }
                     } catch (Exception e) {
                         System.out.println(utility.UIUtils.RED + "  [!] ERROR: Invalid date format." + utility.UIUtils.RESET);
-                        break; // Repeat Step 0
+                        break; // Repeat Step 1
                     }
                     checkIn = val;
                     step++;
                     break;
                 }
-                case 1: {
-                    utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 3/7 - Check-Out Date   ", checkIn, checkOut);
+                case 2: {
+                    utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 3/3 - Check-Out Date   ", checkIn, checkOut);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
@@ -183,81 +175,17 @@ public class StandardBookingUI {
                     step++;
                     break;
                 }
-                case 2: {
-                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
-                    int availStandard = controller.getAvailableRoomCountForDates("STANDARD", checkIn, checkOut);
-                    int availDeluxe = controller.getAvailableRoomCountForDates("DELUXE", checkIn, checkOut);
-                    int availSuite = controller.getAvailableRoomCountForDates("SUITE", checkIn, checkOut);
-                    
-                    System.out.println("  Available for selected dates (" + checkIn + " to " + checkOut + "):");
-                    System.out.println("  - STANDARD : " + availStandard + " room(s)");
-                    System.out.println("  - DELUXE   : " + availDeluxe + " room(s)");
-                    System.out.println("  - SUITE    : " + availSuite + " room(s)");
-                    
-                    utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 4/7 - Preferred Room   ", roomType);
-                    if (res.isGoBack()) {
-                        step--;
-                        break;
-                    }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    roomType = res.getValue();
-                    
-                    int availCount = controller.getAvailableRoomCountForDates(roomType, checkIn, checkOut);
-                    if (availCount == 0) {
-                        System.out.println(utility.UIUtils.YELLOW + "\n  [!] WARNING: No rooms of type " + roomType + " are available for these dates." + utility.UIUtils.RESET);
-                        System.out.print("      This registration will be enqueued in the PENDING queue. Proceed? (Y/N): ");
-                        String proceed = utility.UIUtils.safeReadLine(scanner).trim();
-                        if (!"Y".equalsIgnoreCase(proceed)) {
-                            roomType = "";
-                            break; // Repeat Step 2
-                        }
-                    }
-                    if (returningGuest) {
-                        step = 6; // Exit loop, returning guest has profile loaded
-                    } else {
-                        step++;
-                    }
-                    break;
-                }
-                case 3: {
-                    utility.StepResult res = utility.ValidationUtils.readValidNameStep(scanner, "Step 5/7 - Guest Name       ", name);
-                    if (res.isGoBack()) { step--; break; }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    name = res.getValue();
-                    step++;
-                    break;
-                }
-                case 4: {
-                    utility.StepResult res = utility.ValidationUtils.readValidIcPassportStep(scanner, "Step 6/7 - IC / Passport No ", icPassport);
-                    if (res.isGoBack()) { step--; break; }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    icPassport = res.getValue();
-                    step++;
-                    break;
-                }
-                case 5: {
-                    utility.StepResult res = utility.ValidationUtils.readValidEmailStep(scanner, "Step 7/7 - Email Address    ", email);
-                    if (res.isGoBack()) { step--; break; }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    email = res.getValue();
-                    step++;
-                    break;
-                }
             }
         }
 
         if (step < 0) {
-            System.out.println("\n  [!] Walk-in registration cancelled. No data saved.");
+            System.out.println("\n  [!] Booking creation cancelled. No data saved.");
             return false;
         }
 
         // Double-booking check
-        if (existingGuest != null) {
-            Reservation overlap = controller.findOverlappingReservation(existingGuest.getGuestId(), checkIn, checkOut);
+        if (guest != null) {
+            Reservation overlap = controller.findOverlappingReservation(guest.getGuestId(), checkIn, checkOut);
             if (overlap != null) {
                 System.out.println(utility.UIUtils.RED + "\n  [!] DOUBLE-BOOKING DETECTED!" + utility.UIUtils.RESET);
                 System.out.println("  Guest already has an active booking for overlapping dates:");
@@ -269,14 +197,13 @@ public class StandardBookingUI {
                 System.out.print("\n  Are you sure you want to proceed with this additional booking? (Y/N): ");
                 String proceed = utility.UIUtils.safeReadLine(scanner).trim();
                 if (!"Y".equalsIgnoreCase(proceed)) {
-                    System.out.println("\n  [!] Walk-in registration cancelled due to double-booking detection.");
+                    System.out.println("\n  [!] Booking creation cancelled due to double-booking detection.");
                     return false;
                 }
             }
         }
 
-        Reservation res = controller.registerWalkIn(name, icPassport, contactNo, email,
-                                                     roomType, checkIn, checkOut);
+        Reservation res = controller.registerBookingForGuest(guest, roomType, checkIn, checkOut);
 
         System.out.println("\n+------------------------------------------+");
         System.out.println("  BOOKING REGISTERED SUCCESSFULLY!");

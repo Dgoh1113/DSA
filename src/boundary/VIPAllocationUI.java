@@ -16,15 +16,10 @@ public class VIPAllocationUI {
 
     private VIPAllocationController controller;
     private Scanner scanner;
-    private Guest authenticatedGuest;
 
     public VIPAllocationUI(VIPAllocationController controller, Scanner scanner) {
         this.controller = controller;
         this.scanner = scanner;
-    }
-
-    public void setAuthenticatedGuest(Guest authenticatedGuest) {
-        this.authenticatedGuest = authenticatedGuest;
     }
 
     public void show() {
@@ -101,20 +96,15 @@ public class VIPAllocationUI {
         utility.UIUtils.printSubHeader("MODULE 2 > ADD VIP BOOKING", utility.UIUtils.YELLOW);
         System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type 'b' to go BACK | Type '0' to QUIT TO MAIN MENU | Type 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
 
-        Guest guest;
-        if (authenticatedGuest != null) {
-            guest = authenticatedGuest;
-        } else {
-            utility.StepResult result = utility.ValidationUtils.readValidStringStep(
-                    scanner, "Guest ID", "", false);
-            if (result.isQuitToMain()) return true;
-            if (result.isCancel() || result.isGoBack()) return false;
+        utility.StepResult result = utility.ValidationUtils.readValidStringStep(
+                scanner, "Guest ID", "", false);
+        if (result.isQuitToMain()) return true;
+        if (result.isCancel() || result.isGoBack()) return false;
 
-            guest = controller.findGuestById(result.getValue());
-            if (guest == null) {
-                System.out.println("\n  [!] Guest ID not found. Register the guest through Module 1 first.");
-                return false;
-            }
+        Guest guest = controller.findGuestById(result.getValue());
+        if (guest == null) {
+            System.out.println("\n  [!] Guest ID not found. Please register the guest before creating a booking.");
+            return false;
         }
         if (!guest.isVIP()) {
             System.out.println("\n  [!] " + guest.getName() + " (" + guest.getGuestId()
