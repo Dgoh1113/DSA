@@ -271,24 +271,87 @@ public class VIPAllocationController {
      * @param bookingStatus reservation status, or ALL
      */
     public VIPAllocationDemandReport generateVIPAllocationDemandReport(
-            String minimumTier, String roomType, String bookingStatus) {
-        int minimumTierWeight = getTierWeight(minimumTier);
+            DoublyLinkedList<String> allowedTiers, DoublyLinkedList<String> roomTypes, DoublyLinkedList<String> bookingStatuses) {
         DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
+
+        boolean allowAllTiers = allowedTiers.isEmpty();
+        for (int i = 1; i <= allowedTiers.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(allowedTiers.getEntry(i))) {
+                allowAllTiers = true;
+                break;
+            }
+        }
+
+        boolean allowAllRooms = roomTypes.isEmpty();
+        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
+                allowAllRooms = true;
+                break;
+            }
+        }
+
+        boolean allowAllStatuses = bookingStatuses.isEmpty();
+        for (int i = 1; i <= bookingStatuses.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(bookingStatuses.getEntry(i))) {
+                allowAllStatuses = true;
+                break;
+            }
+        }
 
         // Search/filter all VIP reservations by tier, room type, and status.
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation reservation = reservations.getEntry(i);
             Guest guest = reservation == null ? null : reservation.getGuest();
-            if (guest == null || guest.getTierWeight() < minimumTierWeight) {
+            if (guest == null) {
                 continue;
             }
-            if (!"ALL".equals(roomType) && !roomType.equals(reservation.getRoomType())) {
-                continue;
+            if (!guest.isVIP()) {
+                continue; // Skip non-VIP
             }
-            if (!"ALL".equals(bookingStatus) && !bookingStatus.equals(reservation.getBookingStatus())) {
-                continue;
+            
+            // Check tier
+            if (!allowAllTiers) {
+                boolean tierMatched = false;
+                for (int j = 1; j <= allowedTiers.getNumberOfEntries(); j++) {
+                    if (allowedTiers.getEntry(j).equalsIgnoreCase(guest.getLoyaltyTier())) {
+                        tierMatched = true;
+                        break;
+                    }
+                }
+                if (!tierMatched) {
+                    continue;
+                }
             }
+
+            // Check room type
+            if (!allowAllRooms) {
+                boolean roomMatched = false;
+                for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
+                    if (roomTypes.getEntry(j).equalsIgnoreCase(reservation.getRoomType())) {
+                        roomMatched = true;
+                        break;
+                    }
+                }
+                if (!roomMatched) {
+                    continue;
+                }
+            }
+
+            // Check status
+            if (!allowAllStatuses) {
+                boolean statusMatched = false;
+                for (int j = 1; j <= bookingStatuses.getNumberOfEntries(); j++) {
+                    if (bookingStatuses.getEntry(j).equalsIgnoreCase(reservation.getBookingStatus())) {
+                        statusMatched = true;
+                        break;
+                    }
+                }
+                if (!statusMatched) {
+                    continue;
+                }
+            }
+
             matches.add(reservation);
         }
 
@@ -301,7 +364,39 @@ public class VIPAllocationController {
                             ? priorityComparison
                             : first.getConfirmationNo().compareTo(second.getConfirmationNo());
                 });
-        return new VIPAllocationDemandReport(minimumTier, roomType, bookingStatus, sortedMatches);
+
+        // Format filter strings
+        StringBuilder tierSb = new StringBuilder();
+        if (allowAllTiers) {
+            tierSb.append("ALL");
+        } else {
+            for (int i = 1; i <= allowedTiers.getNumberOfEntries(); i++) {
+                if (i > 1) tierSb.append(", ");
+                tierSb.append(allowedTiers.getEntry(i));
+            }
+        }
+
+        StringBuilder roomSb = new StringBuilder();
+        if (allowAllRooms) {
+            roomSb.append("ALL");
+        } else {
+            for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+                if (i > 1) roomSb.append(", ");
+                roomSb.append(roomTypes.getEntry(i));
+            }
+        }
+
+        StringBuilder statusSb = new StringBuilder();
+        if (allowAllStatuses) {
+            statusSb.append("ALL");
+        } else {
+            for (int i = 1; i <= bookingStatuses.getNumberOfEntries(); i++) {
+                if (i > 1) statusSb.append(", ");
+                statusSb.append(bookingStatuses.getEntry(i));
+            }
+        }
+
+        return new VIPAllocationDemandReport(tierSb.toString(), roomSb.toString(), statusSb.toString(), sortedMatches);
     }
 
     private int getTierWeight(String tier) {

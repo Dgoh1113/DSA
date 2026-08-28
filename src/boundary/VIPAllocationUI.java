@@ -156,32 +156,43 @@ public class VIPAllocationUI {
         while (step <= 2) {
             switch (step) {
                 case 0: {
-                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
-                    utility.StepResult result = utility.ValidationUtils.readValidRoomTypeStep(
-                            scanner, "Step 1/3 - Preferred Room", roomType);
+                    utility.StepResult result = utility.ValidationUtils.readValidDateStep(
+                            scanner, "Step 1/3 - Check-In (YYYY-MM-DD)", checkIn);
                     if (result.isGoBack() || result.isCancel()) return false;
                     if (result.isQuitToMain()) return true;
-                    roomType = result.getValue();
+                    String val = result.getValue();
+                    try {
+                        java.time.LocalDate date = java.time.LocalDate.parse(val);
+                        if (date.isBefore(java.time.LocalDate.now())) {
+                            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Check-in date cannot be in the past (before " + java.time.LocalDate.now() + ")." + utility.UIUtils.RESET);
+                            break; // Repeat Step 0
+                        }
+                    } catch (Exception e) {
+                        System.out.println(utility.UIUtils.RED + "  [!] ERROR: Invalid date format." + utility.UIUtils.RESET);
+                        break; // Repeat Step 0
+                    }
+                    checkIn = val;
                     step++;
                     break;
                 }
                 case 1: {
-                    utility.StepResult result = utility.ValidationUtils.readValidDateStep(
-                            scanner, "Step 2/3 - Check-In (YYYY-MM-DD)", checkIn);
-                    if (result.isGoBack()) { step--; break; }
-                    if (result.isCancel()) return false;
-                    if (result.isQuitToMain()) return true;
-                    checkIn = result.getValue();
-                    step++;
-                    break;
-                }
-                case 2: {
                     utility.StepResult result = utility.ValidationUtils.readValidCheckOutDateStep(
-                            scanner, "Step 3/3 - Check-Out Date", checkIn, checkOut);
+                            scanner, "Step 2/3 - Check-Out Date", checkIn, checkOut);
                     if (result.isGoBack()) { step--; break; }
                     if (result.isCancel()) return false;
                     if (result.isQuitToMain()) return true;
                     checkOut = result.getValue();
+                    step++;
+                    break;
+                }
+                case 2: {
+                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+                    utility.StepResult result = utility.ValidationUtils.readValidRoomTypeStep(
+                            scanner, "Step 3/3 - Preferred Room", roomType);
+                    if (result.isGoBack()) { step--; break; }
+                    if (result.isCancel()) return false;
+                    if (result.isQuitToMain()) return true;
+                    roomType = result.getValue();
                     step++;
                     break;
                 }
@@ -331,24 +342,116 @@ DoublyLinkedList<VIPReservation> list = controller.getVIPQueueList();
     /** Collects three management filters and displays the priority-ranked results. */
     private void vipAllocationDemandReport() {
         utility.UIUtils.printSubHeader("MODULE 2 > VIP ALLOCATION DEMAND REPORT", utility.UIUtils.YELLOW);
-        String minimumTier = readReportChoice("Minimum tier (SILVER | GOLD | PLATINUM | DIAMOND): ",
-                "SILVER|GOLD|PLATINUM|DIAMOND");
-        String roomType = readReportChoice("Room type (ALL | STANDARD | DELUXE | SUITE): ",
-                "ALL|STANDARD|DELUXE|SUITE");
-        String bookingStatus = readReportChoice(
-                "Status (ALL | PENDING | CONFIRMED | CHECKED_IN | CHECKED_OUT | CANCELLED): ",
-                "ALL|PENDING|CONFIRMED|CHECKED_IN|CHECKED_OUT|CANCELLED");
+        
+        System.out.println("  Select Loyalty Tier(s) to filter by:");
+        System.out.println("    1. SILVER");
+        System.out.println("    2. GOLD");
+        System.out.println("    3. PLATINUM");
+        System.out.println("    4. DIAMOND");
+        System.out.println("    5. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 5 for ALL): ");
+        String tierInput = scanner.nextLine().trim();
+        DoublyLinkedList<String> tierFilters = new DoublyLinkedList<>();
+        if (tierInput.isEmpty()) {
+            tierFilters.add("ALL");
+        } else {
+            String[] parts = tierInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1": tierFilters.add("SILVER"); break;
+                    case "2": tierFilters.add("GOLD"); break;
+                    case "3": tierFilters.add("PLATINUM"); break;
+                    case "4": tierFilters.add("DIAMOND"); break;
+                    case "5":
+                    default:
+                        if (choice.equals("5")) {
+                            tierFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (tierFilters.isEmpty()) {
+            tierFilters.add("ALL");
+        }
+
+        System.out.println("  Select Room Type(s) to filter by:");
+        System.out.println("    1. STANDARD");
+        System.out.println("    2. DELUXE");
+        System.out.println("    3. SUITE");
+        System.out.println("    4. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 4 for ALL): ");
+        String roomInput = scanner.nextLine().trim();
+        DoublyLinkedList<String> roomFilters = new DoublyLinkedList<>();
+        if (roomInput.isEmpty()) {
+            roomFilters.add("ALL");
+        } else {
+            String[] parts = roomInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1": roomFilters.add("STANDARD"); break;
+                    case "2": roomFilters.add("DELUXE"); break;
+                    case "3": roomFilters.add("SUITE"); break;
+                    case "4":
+                    default:
+                        if (choice.equals("4")) {
+                            roomFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (roomFilters.isEmpty()) {
+            roomFilters.add("ALL");
+        }
+
+        System.out.println("  Select Booking Status(es) to filter by:");
+        System.out.println("    1. PENDING");
+        System.out.println("    2. CONFIRMED");
+        System.out.println("    3. CHECKED_IN");
+        System.out.println("    4. CHECKED_OUT");
+        System.out.println("    5. CANCELLED");
+        System.out.println("    6. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 6 for ALL): ");
+        String statusInput = scanner.nextLine().trim();
+        DoublyLinkedList<String> statusFilters = new DoublyLinkedList<>();
+        if (statusInput.isEmpty()) {
+            statusFilters.add("ALL");
+        } else {
+            String[] parts = statusInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1": statusFilters.add("PENDING"); break;
+                    case "2": statusFilters.add("CONFIRMED"); break;
+                    case "3": statusFilters.add("CHECKED_IN"); break;
+                    case "4": statusFilters.add("CHECKED_OUT"); break;
+                    case "5": statusFilters.add("CANCELLED"); break;
+                    case "6":
+                    default:
+                        if (choice.equals("6")) {
+                            statusFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (statusFilters.isEmpty()) {
+            statusFilters.add("ALL");
+        }
 
         VIPAllocationController.VIPAllocationDemandReport report =
-                controller.generateVIPAllocationDemandReport(minimumTier, roomType, bookingStatus);
+                controller.generateVIPAllocationDemandReport(tierFilters, roomFilters, statusFilters);
         DoublyLinkedList<Reservation> reservations = report.getReservations();
 
         System.out.println("\n+--------------------------------------------------------------------------------------------------+");
         System.out.println("                         VIP ALLOCATION DEMAND REPORT");
         System.out.println("+--------------------------------------------------------------------------------------------------+");
-        System.out.println("  Filters: Minimum Tier = " + report.getMinimumTier()
-                + " | Room Type = " + report.getRoomType()
-                + " | Status = " + report.getBookingStatus());
+        System.out.println("  Filters: Tiers = " + report.getMinimumTier()
+                + " | Room Types = " + report.getRoomType()
+                + " | Statuses = " + report.getBookingStatus());
         System.out.println("  Search: reservation registry scan  |  Sort: MergeSort by priority (highest first)");
         System.out.println("+-----+--------------+----------------------+----------+----------+----------+------------+------------+");
         System.out.println("| No. | Confirmation | Guest Name           | Tier     | Room     | Priority | Check-In   | Status     |");
