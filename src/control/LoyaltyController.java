@@ -433,30 +433,12 @@ public class LoyaltyController {
      * @param tier The loyalty tier to filter by.
      * @return Sorted list of accounts matching the tier.
      */
-    public DoublyLinkedList<LoyaltyAccount> generateTierReport(DoublyLinkedList<String> tiers) {
+    public DoublyLinkedList<LoyaltyAccount> generateTierReport(String tier) {
         ensureAllGuestsHaveAccounts();
         DoublyLinkedList<LoyaltyAccount> filtered = new DoublyLinkedList<>();
-        
-        boolean allowAllTiers = tiers.isEmpty();
-        for (int i = 1; i <= tiers.getNumberOfEntries(); i++) {
-            if ("ALL".equalsIgnoreCase(tiers.getEntry(i))) {
-                allowAllTiers = true;
-                break;
-            }
-        }
-
         for (int i = 1; i <= loyaltyAccounts.getNumberOfEntries(); i++) {
             LoyaltyAccount account = loyaltyAccounts.getEntry(i);
-            boolean matched = allowAllTiers;
-            if (!allowAllTiers) {
-                for (int j = 1; j <= tiers.getNumberOfEntries(); j++) {
-                    if (tiers.getEntry(j).equalsIgnoreCase(account.getTierStatus())) {
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-            if (matched) {
+            if (account.getTierStatus().equals(tier)) {
                 filtered.add(account);
             }
         }
@@ -468,26 +450,18 @@ public class LoyaltyController {
      * Builds a management-ready loyalty report by searching member records,
      * applying all selected filters, then ranking the matches by points.
      *
-     * @param tierFilters      Loyalty tiers, or ALL for every tier.
+     * @param tierFilter       A loyalty tier, or ALL for every tier.
      * @param minimumPoints    Minimum current points required.
      * @param expiryWithinDays Positive value filters to points expiring in that
      *                         period; zero disables the expiry filter.
      * @param memberSearchTerm Optional member ID or guest-name search text.
      */
     public DoublyLinkedList<ManagementReportEntry> generateManagementReport(
-            DoublyLinkedList<String> tierFilters, int minimumPoints, int expiryWithinDays,
+            String tierFilter, int minimumPoints, int expiryWithinDays,
             String memberSearchTerm) {
         ensureAllGuestsHaveAccounts();
         DoublyLinkedList<ManagementReportEntry> matches = new DoublyLinkedList<>();
-        
-        boolean allowAllTiers = tierFilters.isEmpty();
-        for (int i = 1; i <= tierFilters.getNumberOfEntries(); i++) {
-            if ("ALL".equalsIgnoreCase(tierFilters.getEntry(i))) {
-                allowAllTiers = true;
-                break;
-            }
-        }
-        
+        String normalizedTier = tierFilter == null ? "ALL" : tierFilter.trim().toUpperCase();
         String normalizedSearch = memberSearchTerm == null
                 ? "" : memberSearchTerm.trim().toLowerCase();
         int pointsThreshold = Math.max(0, minimumPoints);
@@ -497,16 +471,8 @@ public class LoyaltyController {
             Guest guest = findGuest(account.getMemberId()); // member-record search
             String guestName = guest == null ? "Unknown" : guest.getName();
 
-            boolean matchesTier = allowAllTiers;
-            if (!allowAllTiers) {
-                for (int j = 1; j <= tierFilters.getNumberOfEntries(); j++) {
-                    if (tierFilters.getEntry(j).equalsIgnoreCase(account.getTierStatus())) {
-                        matchesTier = true;
-                        break;
-                    }
-                }
-            }
-            
+            boolean matchesTier = "ALL".equals(normalizedTier)
+                    || normalizedTier.equals(account.getTierStatus());
             boolean matchesPoints = account.getTotalPoints() >= pointsThreshold;
             boolean matchesExpiry = expiryWithinDays <= 0
                     || hasExpiryWithinDays(account.getPointsExpiryDate(), expiryWithinDays);

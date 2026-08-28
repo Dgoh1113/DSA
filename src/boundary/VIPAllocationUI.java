@@ -215,43 +215,32 @@ public class VIPAllocationUI {
         while (step <= 2) {
             switch (step) {
                 case 0: {
-                    utility.StepResult result = utility.ValidationUtils.readValidDateStep(
-                            scanner, "Step 1/3 - Check-In (YYYY-MM-DD)", checkIn);
+                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+                    utility.StepResult result = utility.ValidationUtils.readValidRoomTypeStep(
+                            scanner, "Step 1/3 - Preferred Room", roomType);
                     if (result.isGoBack() || result.isCancel()) return false;
                     if (result.isQuitToMain()) return true;
-                    String val = result.getValue();
-                    try {
-                        java.time.LocalDate date = java.time.LocalDate.parse(val);
-                        if (date.isBefore(java.time.LocalDate.now())) {
-                            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Check-in date cannot be in the past (before " + java.time.LocalDate.now() + ")." + utility.UIUtils.RESET);
-                            break; // Repeat Step 0
-                        }
-                    } catch (Exception e) {
-                        System.out.println(utility.UIUtils.RED + "  [!] ERROR: Invalid date format." + utility.UIUtils.RESET);
-                        break; // Repeat Step 0
-                    }
-                    checkIn = val;
+                    roomType = result.getValue();
                     step++;
                     break;
                 }
                 case 1: {
-                    utility.StepResult result = utility.ValidationUtils.readValidCheckOutDateStep(
-                            scanner, "Step 2/3 - Check-Out Date", checkIn, checkOut);
+                    utility.StepResult result = utility.ValidationUtils.readValidDateStep(
+                            scanner, "Step 2/3 - Check-In (YYYY-MM-DD)", checkIn);
                     if (result.isGoBack()) { step--; break; }
                     if (result.isCancel()) return false;
                     if (result.isQuitToMain()) return true;
-                    checkOut = result.getValue();
+                    checkIn = result.getValue();
                     step++;
                     break;
                 }
                 case 2: {
-                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
-                    utility.StepResult result = utility.ValidationUtils.readValidRoomTypeStep(
-                            scanner, "Step 3/3 - Preferred Room", roomType);
+                    utility.StepResult result = utility.ValidationUtils.readValidCheckOutDateStep(
+                            scanner, "Step 3/3 - Check-Out Date", checkIn, checkOut);
                     if (result.isGoBack()) { step--; break; }
                     if (result.isCancel()) return false;
                     if (result.isQuitToMain()) return true;
-                    roomType = result.getValue();
+                    checkOut = result.getValue();
                     step++;
                     break;
                 }
