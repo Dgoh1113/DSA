@@ -6,3 +6,4 @@ G1005|Kaizen Scott|981105-03-9900|018-1119900|kaizen.scott@test.com|DIAMOND
 G1006|Elvin Young|930419-14-2233|014-9992233|elvin.young@test.com|STANDARD
 G1007|Roxy King|950928-08-4455|012-8884455|roxy.king@test.com|SILVER
 G1008|Eason Smith|950928-08-4455|012-8884488|eason.smith@test.com|DIAMOND
+G1009|Damien Goh|123012321|0129339662|dgoh2004@gmail.com|STANDARD

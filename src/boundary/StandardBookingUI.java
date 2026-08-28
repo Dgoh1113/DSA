@@ -47,11 +47,27 @@ public class StandardBookingUI {
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 3:
-                    peekNextBooking();
+                    modifyPendingBooking();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 4:
+                    cancelPendingBooking();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 5:
+                    peekNextBooking();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 6:
                     viewQueue();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 7:
+                    generateRevenueReport();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 8:
+                    generateQueuePerformanceReport();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 0:
@@ -69,9 +85,17 @@ public class StandardBookingUI {
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Register Walk-In Guest");
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " Process Next Booking (Assign Room)");
 
+        utility.UIUtils.printSectionHeader("REGISTRATION MANAGEMENT", utility.UIUtils.CYAN);
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Modify Pending Booking");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Cancel Pending Booking");
+
         utility.UIUtils.printSectionHeader("QUEUE MONITORING", utility.UIUtils.CYAN);
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Peek Next Guest in Queue");
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " View Entire Standard Queue");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Peek Next Guest in Queue");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Entire Standard Queue");
+
+        utility.UIUtils.printSectionHeader("REPORTS & ANALYTICS", utility.UIUtils.YELLOW);
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Standard Reservation Revenue Report (MergeSort)");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Standard Queue Performance & Shortage Report");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -126,19 +150,87 @@ public class StandardBookingUI {
             System.out.println("\n  Phone number is not registered. Please enter the new guest details.\n");
         }
 
-        int step = returningGuest ? 3 : 0;
+        printRoomCatalogueTable();
+
+        int step = 0;
         while (step >= 0 && step <= 5) {
             switch (step) {
                 case 0: {
-                    utility.StepResult res = utility.ValidationUtils.readValidNameStep(scanner, "Step 2/7 - Guest Name       ", name);
+                    utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 2/7 - Check-In (YYYY-MM-DD) ", checkIn);
+                    if (res.isQuitToMain()) return true;
+                    if (res.isCancel()) return false;
+                    String val = res.getValue();
+                    try {
+                        java.time.LocalDate date = java.time.LocalDate.parse(val);
+                        if (date.isBefore(java.time.LocalDate.now())) {
+                            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Check-in date cannot be in the past (before " + java.time.LocalDate.now() + ")." + utility.UIUtils.RESET);
+                            break; // Repeat Step 0
+                        }
+                    } catch (Exception e) {
+                        System.out.println(utility.UIUtils.RED + "  [!] ERROR: Invalid date format." + utility.UIUtils.RESET);
+                        break; // Repeat Step 0
+                    }
+                    checkIn = val;
+                    step++;
+                    break;
+                }
+                case 1: {
+                    utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 3/7 - Check-Out Date   ", checkIn, checkOut);
+                    if (res.isGoBack()) { step--; break; }
+                    if (res.isQuitToMain()) return true;
+                    if (res.isCancel()) return false;
+                    checkOut = res.getValue();
+                    step++;
+                    break;
+                }
+                case 2: {
+                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+                    int availStandard = controller.getAvailableRoomCountForDates("STANDARD", checkIn, checkOut);
+                    int availDeluxe = controller.getAvailableRoomCountForDates("DELUXE", checkIn, checkOut);
+                    int availSuite = controller.getAvailableRoomCountForDates("SUITE", checkIn, checkOut);
+                    
+                    System.out.println("  Available for selected dates (" + checkIn + " to " + checkOut + "):");
+                    System.out.println("  - STANDARD : " + availStandard + " room(s)");
+                    System.out.println("  - DELUXE   : " + availDeluxe + " room(s)");
+                    System.out.println("  - SUITE    : " + availSuite + " room(s)");
+                    
+                    utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 4/7 - Preferred Room   ", roomType);
+                    if (res.isGoBack()) {
+                        step--;
+                        break;
+                    }
+                    if (res.isQuitToMain()) return true;
+                    if (res.isCancel()) return false;
+                    roomType = res.getValue();
+                    
+                    int availCount = controller.getAvailableRoomCountForDates(roomType, checkIn, checkOut);
+                    if (availCount == 0) {
+                        System.out.println(utility.UIUtils.YELLOW + "\n  [!] WARNING: No rooms of type " + roomType + " are available for these dates." + utility.UIUtils.RESET);
+                        System.out.print("      This registration will be enqueued in the PENDING queue. Proceed? (Y/N): ");
+                        String proceed = utility.UIUtils.safeReadLine(scanner).trim();
+                        if (!"Y".equalsIgnoreCase(proceed)) {
+                            roomType = "";
+                            break; // Repeat Step 2
+                        }
+                    }
+                    if (returningGuest) {
+                        step = 6; // Exit loop, returning guest has profile loaded
+                    } else {
+                        step++;
+                    }
+                    break;
+                }
+                case 3: {
+                    utility.StepResult res = utility.ValidationUtils.readValidNameStep(scanner, "Step 5/7 - Guest Name       ", name);
+                    if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     name = res.getValue();
                     step++;
                     break;
                 }
-                case 1: {
-                    utility.StepResult res = utility.ValidationUtils.readValidIcPassportStep(scanner, "Step 3/7 - IC / Passport No ", icPassport);
+                case 4: {
+                    utility.StepResult res = utility.ValidationUtils.readValidIcPassportStep(scanner, "Step 6/7 - IC / Passport No ", icPassport);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
@@ -146,44 +238,12 @@ public class StandardBookingUI {
                     step++;
                     break;
                 }
-                case 2: {
-                    utility.StepResult res = utility.ValidationUtils.readValidEmailStep(scanner, "Step 4/7 - Email Address    ", email);
+                case 5: {
+                    utility.StepResult res = utility.ValidationUtils.readValidEmailStep(scanner, "Step 7/7 - Email Address    ", email);
                     if (res.isGoBack()) { step--; break; }
                     if (res.isQuitToMain()) return true;
                     if (res.isCancel()) return false;
                     email = res.getValue();
-                    step++;
-                    break;
-                }
-                case 3: {
-                    System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
-                    utility.StepResult res = utility.ValidationUtils.readValidRoomTypeStep(scanner, "Step 5/7 - Preferred Room   ", roomType);
-                    if (res.isGoBack()) {
-                        if (returningGuest) return false;
-                        step--;
-                        break;
-                    }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    roomType = res.getValue();
-                    step++;
-                    break;
-                }
-                case 4: {
-                    utility.StepResult res = utility.ValidationUtils.readValidDateStep(scanner, "Step 6/7 - Check-In (YYYY-MM-DD) ", checkIn);
-                    if (res.isGoBack()) { step--; break; }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    checkIn = res.getValue();
-                    step++;
-                    break;
-                }
-                case 5: {
-                    utility.StepResult res = utility.ValidationUtils.readValidCheckOutDateStep(scanner, "Step 7/7 - Check-Out Date   ", checkIn, checkOut);
-                    if (res.isGoBack()) { step--; break; }
-                    if (res.isQuitToMain()) return true;
-                    if (res.isCancel()) return false;
-                    checkOut = res.getValue();
                     step++;
                     break;
                 }
@@ -193,6 +253,26 @@ public class StandardBookingUI {
         if (step < 0) {
             System.out.println("\n  [!] Walk-in registration cancelled. No data saved.");
             return false;
+        }
+
+        // Double-booking check
+        if (existingGuest != null) {
+            Reservation overlap = controller.findOverlappingReservation(existingGuest.getGuestId(), checkIn, checkOut);
+            if (overlap != null) {
+                System.out.println(utility.UIUtils.RED + "\n  [!] DOUBLE-BOOKING DETECTED!" + utility.UIUtils.RESET);
+                System.out.println("  Guest already has an active booking for overlapping dates:");
+                System.out.println("  Confirmation No : " + overlap.getConfirmationNo());
+                System.out.println("  Room Type       : " + overlap.getRoomType());
+                System.out.println("  Check-In Date   : " + overlap.getCheckInDate());
+                System.out.println("  Check-Out Date  : " + overlap.getCheckOutDate());
+                System.out.println("  Booking Status  : " + overlap.getBookingStatus());
+                System.out.print("\n  Are you sure you want to proceed with this additional booking? (Y/N): ");
+                String proceed = utility.UIUtils.safeReadLine(scanner).trim();
+                if (!"Y".equalsIgnoreCase(proceed)) {
+                    System.out.println("\n  [!] Walk-in registration cancelled due to double-booking detection.");
+                    return false;
+                }
+            }
         }
 
         Reservation res = controller.registerWalkIn(name, icPassport, contactNo, email,
@@ -207,9 +287,47 @@ public class StandardBookingUI {
         System.out.println("  Check-In        : " + res.getCheckInDate());
         System.out.println("  Check-Out       : " + res.getCheckOutDate());
         System.out.println("  Status          : " + res.getBookingStatus());
-        System.out.println("  Queue Position  : " + controller.getQueueSize());
+        if ("CONFIRMED".equals(res.getBookingStatus())) {
+            System.out.println("  Room Assigned   : " + res.getAssignedRoomNo());
+        } else {
+            System.out.println("  Queue Position  : " + controller.getQueueSize());
+        }
         System.out.println("+------------------------------------------+");
         return false;
+    }
+
+    private void printRoomCatalogueTable() {
+        System.out.println("\n=========================================================================================");
+        System.out.println("                              TARUMT RESORTS - ROOM CATALOGUE");
+        System.out.println("=========================================================================================");
+        System.out.printf("| %-12s | %-12s | %-12s | %-45s |%n", "Room Type", "Price/Night", "Total Rooms", "Reserved Stay Dates (Today onwards)");
+        System.out.println("+--------------+--------------+--------------+-----------------------------------------------+");
+        
+        printCatalogRow("STANDARD", "RM100.00");
+        System.out.println("+--------------+--------------+--------------+-----------------------------------------------+");
+        printCatalogRow("DELUXE", "RM200.00");
+        System.out.println("+--------------+--------------+--------------+-----------------------------------------------+");
+        printCatalogRow("SUITE", "RM500.00");
+        System.out.println("=========================================================================================\n");
+    }
+
+    private void printCatalogRow(String roomType, String price) {
+        int totalRooms = controller.getTotalRoomCount(roomType);
+        adt.DoublyLinkedList<control.StandardBookingController.DateRange> list = controller.getOccupiedDateRanges(roomType);
+        
+        if (list.isEmpty()) {
+            System.out.printf("| %-12s | %-12s | %-12d | %-45s |%n", roomType, price, totalRooms, "None (All dates fully available)");
+        } else {
+            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
+                control.StandardBookingController.DateRange r = list.getEntry(i);
+                String rangeStr = "* " + r.getCheckIn() + " to " + r.getCheckOut() + " (" + r.getCount() + " booked)";
+                if (i == 1) {
+                    System.out.printf("| %-12s | %-12s | %-12d | %-45s |%n", roomType, price, totalRooms, rangeStr);
+                } else {
+                    System.out.printf("| %-12s | %-12s | %-12s | %-45s |%n", "", "", "", rangeStr);
+                }
+            }
+        }
     }
 
     private void processNextBooking() {
@@ -279,6 +397,272 @@ public class StandardBookingUI {
                     res.getRoomType(), res.getBookingStatus());
         }
         System.out.println("+-----+----------------+----------------+-----------+------------+");
+    }
+
+    private void modifyPendingBooking() {
+        utility.UIUtils.printSubHeader("MODULE 1 > MODIFY PENDING BOOKING", utility.UIUtils.CYAN);
+        System.out.print("Enter Confirmation Number: ");
+        String confNo = utility.UIUtils.safeReadLine(scanner).trim();
+        
+        Reservation res = controller.findReservationByConfNo(confNo);
+        if (res == null) {
+            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Reservation with Confirmation No " + confNo + " not found." + utility.UIUtils.RESET);
+            return;
+        }
+        
+        if (!"PENDING".equals(res.getBookingStatus())) {
+            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Only PENDING reservations can be modified (Status is currently: " + res.getBookingStatus() + ")." + utility.UIUtils.RESET);
+            return;
+        }
+        
+        System.out.println("\n  Current Details:");
+        System.out.println("  Guest ID        : " + res.getGuestId());
+        System.out.println("  Guest Name      : " + (res.getGuest() != null ? res.getGuest().getName() : "N/A"));
+        System.out.println("  Room Type       : " + res.getRoomType());
+        System.out.println("  Check-In        : " + res.getCheckInDate());
+        System.out.println("  Check-Out       : " + res.getCheckOutDate());
+        System.out.println();
+        
+        System.out.println("  Enter new details (leave blank to keep current):");
+        
+        // 1. Room type modification
+        System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
+        System.out.print("  New Room Type [" + res.getRoomType() + "]: ");
+        String roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+        if (roomType.isEmpty()) {
+            roomType = res.getRoomType();
+        } else {
+            while (!roomType.equals("STANDARD") && !roomType.equals("DELUXE") && !roomType.equals("SUITE")) {
+                System.out.println("  [!] ERROR: Invalid room type. Choose STANDARD | DELUXE | SUITE.");
+                System.out.print("  New Room Type [" + res.getRoomType() + "]: ");
+                roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+                if (roomType.isEmpty()) {
+                    roomType = res.getRoomType();
+                    break;
+                }
+            }
+        }
+        
+        // 2. Check-In Date
+        System.out.print("  New Check-In (YYYY-MM-DD) [" + res.getCheckInDate() + "]: ");
+        String checkIn = utility.UIUtils.safeReadLine(scanner).trim();
+        if (checkIn.isEmpty()) {
+            checkIn = res.getCheckInDate();
+        } else {
+            while (!utility.ValidationUtils.isValidDate(checkIn)) {
+                System.out.println("  [!] ERROR: Invalid date format. Enter in YYYY-MM-DD format.");
+                System.out.print("  New Check-In (YYYY-MM-DD) [" + res.getCheckInDate() + "]: ");
+                checkIn = utility.UIUtils.safeReadLine(scanner).trim();
+                if (checkIn.isEmpty()) {
+                    checkIn = res.getCheckInDate();
+                    break;
+                }
+            }
+        }
+        
+        // 3. Check-Out Date
+        System.out.print("  New Check-Out Date (YYYY-MM-DD) [" + res.getCheckOutDate() + "]: ");
+        String checkOut = utility.UIUtils.safeReadLine(scanner).trim();
+        if (checkOut.isEmpty()) {
+            checkOut = res.getCheckOutDate();
+        } else {
+            while (true) {
+                if (!utility.ValidationUtils.isValidDate(checkOut)) {
+                    System.out.println("  [!] ERROR: Invalid date format. Enter in YYYY-MM-DD format.");
+                } else if (!java.time.LocalDate.parse(checkOut).isAfter(java.time.LocalDate.parse(checkIn))) {
+                    System.out.println("  [!] ERROR: Check-out date must be strictly after check-in date (" + checkIn + ").");
+                } else {
+                    break;
+                }
+                System.out.print("  New Check-Out Date (YYYY-MM-DD) [" + res.getCheckOutDate() + "]: ");
+                checkOut = utility.UIUtils.safeReadLine(scanner).trim();
+                if (checkOut.isEmpty()) {
+                    checkOut = res.getCheckOutDate();
+                    break;
+                }
+            }
+        }
+        
+        // Check for double booking conflict if stay dates are changed
+        Reservation overlap = controller.findOverlappingReservation(res.getGuestId(), checkIn, checkOut);
+        if (overlap != null && !overlap.getConfirmationNo().equals(res.getConfirmationNo())) {
+            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Cannot modify. Overlap detected with existing Conf #" + overlap.getConfirmationNo() + "." + utility.UIUtils.RESET);
+            return;
+        }
+        
+        System.out.print("\n  Confirm modification? (Y/N): ");
+        if ("Y".equalsIgnoreCase(utility.UIUtils.safeReadLine(scanner))) {
+            boolean success = controller.modifyPendingReservation(confNo, roomType, checkIn, checkOut);
+            if (success) {
+                System.out.println(utility.UIUtils.GREEN + "  [+] Reservation modified successfully!" + utility.UIUtils.RESET);
+            } else {
+                System.out.println(utility.UIUtils.RED + "  [!] Modification failed." + utility.UIUtils.RESET);
+            }
+        } else {
+            System.out.println("  Modification cancelled.");
+        }
+    }
+
+    private void cancelPendingBooking() {
+        utility.UIUtils.printSubHeader("MODULE 1 > CANCEL PENDING BOOKING", utility.UIUtils.CYAN);
+        System.out.print("Enter Confirmation Number: ");
+        String confNo = utility.UIUtils.safeReadLine(scanner).trim();
+        
+        Reservation res = controller.findReservationByConfNo(confNo);
+        if (res == null) {
+            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Reservation with Confirmation No " + confNo + " not found." + utility.UIUtils.RESET);
+            return;
+        }
+        
+        if (!"PENDING".equals(res.getBookingStatus())) {
+            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Only PENDING reservations can be cancelled here (Status is currently: " + res.getBookingStatus() + ")." + utility.UIUtils.RESET);
+            return;
+        }
+        
+        System.out.println("\n  Reservation Details:");
+        System.out.println("  Guest ID        : " + res.getGuestId());
+        System.out.println("  Guest Name      : " + (res.getGuest() != null ? res.getGuest().getName() : "N/A"));
+        System.out.println("  Room Type       : " + res.getRoomType());
+        System.out.println("  Stay Dates      : " + res.getCheckInDate() + " to " + res.getCheckOutDate());
+        System.out.println();
+        
+        System.out.print("  Are you sure you want to CANCEL this reservation? (Y/N): ");
+        if ("Y".equalsIgnoreCase(utility.UIUtils.safeReadLine(scanner))) {
+            boolean success = controller.cancelPendingReservation(confNo);
+            if (success) {
+                System.out.println(utility.UIUtils.GREEN + "  [+] Reservation cancelled successfully." + utility.UIUtils.RESET);
+            } else {
+                System.out.println(utility.UIUtils.RED + "  [!] Cancellation failed." + utility.UIUtils.RESET);
+            }
+        } else {
+            System.out.println("  Cancellation aborted.");
+        }
+    }
+
+    private void generateRevenueReport() {
+        utility.UIUtils.printSubHeader("REVENUE ANALYSIS REPORT", utility.UIUtils.YELLOW);
+        
+        System.out.print("  Filter by Room Type (STANDARD/DELUXE/SUITE or ALL): ");
+        String roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+        if (roomType.isEmpty()) roomType = "ALL";
+        
+        System.out.print("  Filter by Booking Status (PENDING/CONFIRMED/CANCELLED/CHECKED_IN/CHECKED_OUT or ALL): ");
+        String status = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+        if (status.isEmpty()) status = "ALL";
+        
+        System.out.print("  Filter by Minimum Duration of Stay (days): ");
+        int minDuration = 0;
+        try {
+            String input = utility.UIUtils.safeReadLine(scanner).trim();
+            if (!input.isEmpty()) {
+                minDuration = Integer.parseInt(input);
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("  [!] Invalid number. Minimum duration set to 0.");
+        }
+        
+        StandardBookingController.StandardRevenueReport report = controller.generateRevenueReport(roomType, status, minDuration);
+        
+        System.out.println("\n============================================================================================");
+        System.out.println("                    STANDARD RESERVATIONS REVENUE ANALYSIS REPORT");
+        System.out.println("============================================================================================");
+        System.out.println("  Filters Applied:");
+        System.out.println("  - Room Type      : " + report.getRoomTypeFilter());
+        System.out.println("  - Booking Status : " + report.getStatusFilter());
+        System.out.println("  - Min Duration   : " + report.getMinDurationFilter() + " nights");
+        System.out.println("--------------------------------------------------------------------------------------------");
+        
+        DoublyLinkedList<Reservation> list = report.getReservations();
+        if (list.isEmpty()) {
+            System.out.println("  No reservations matched the filters.");
+        } else {
+            System.out.println("+-----+--------------+----------------------+-----------+------------+------------+---------+");
+            System.out.println("| No. | Confirmation | Guest Name           | Room Type | Check-In   | Status     | Revenue |");
+            System.out.println("+-----+--------------+----------------------+-----------+------------+------------+---------+");
+            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
+                Reservation res = list.getEntry(i);
+                try {
+                    long days = java.time.LocalDate.parse(res.getCheckOutDate()).toEpochDay() - java.time.LocalDate.parse(res.getCheckInDate()).toEpochDay();
+                    double rate = 100.0;
+                    if ("DELUXE".equals(res.getRoomType())) rate = 200.0;
+                    else if ("SUITE".equals(res.getRoomType())) rate = 500.0;
+                    double revenue = days * rate;
+                    String guestName = res.getGuest() != null ? res.getGuest().getName() : res.getGuestId();
+                    if (guestName.length() > 20) guestName = guestName.substring(0, 17) + "...";
+                    
+                    System.out.printf("| %-3d | %-12s | %-20s | %-9s | %-10s | %-10s | RM%6.2f |%n",
+                            i, res.getConfirmationNo(), guestName, res.getRoomType(), res.getCheckInDate(), res.getBookingStatus(), revenue);
+                } catch (Exception e) {
+                    // Ignore
+                }
+            }
+            System.out.println("+-----+--------------+----------------------+-----------+------------+------------+---------+");
+        }
+        
+        System.out.println("============================================================================================");
+        System.out.println("  SUMMARY STATISTICS");
+        System.out.println("============================================================================================");
+        System.out.println("  Total Bookings matched  : " + report.getTotalBookings());
+        System.out.println("  Total Room Nights Sold  : " + report.getTotalDays());
+        System.out.printf("  Total Projected Revenue : RM%.2f%n", report.getTotalRevenue());
+        System.out.printf("  Avg. Revenue / Booking  : RM%.2f%n", report.getAverageRevenuePerBooking());
+        System.out.println("============================================================================================");
+    }
+
+    private void generateQueuePerformanceReport() {
+        utility.UIUtils.printSubHeader("QUEUE PERFORMANCE REPORT", utility.UIUtils.YELLOW);
+        
+        System.out.print("  Filter by Room Type (STANDARD/DELUXE/SUITE or ALL): ");
+        String roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+        if (roomType.isEmpty()) roomType = "ALL";
+        
+        StandardBookingController.QueuePerformanceReport report = controller.generateQueuePerformanceReport(roomType);
+        
+        System.out.println("\n=============================================================================");
+        System.out.println("                    STANDARD QUEUE PERFORMANCE & ROOM SHORTAGE REPORT");
+        System.out.println("=============================================================================");
+        System.out.println("  Room Type Filter: " + report.getRoomTypeFilter());
+        System.out.println("-----------------------------------------------------------------------------");
+        
+        DoublyLinkedList<Reservation> list = report.getPendingReservations();
+        if (list.isEmpty()) {
+            System.out.println("  No guests currently waiting in the standard queue for this room type.");
+        } else {
+            System.out.println("+-----+--------------+----------------------+-----------+------------+------------+-----------------+");
+            System.out.println("| Pos | Confirmation | Guest Name           | Room Type | Check-In   | Check-Out  | Waiting Time    |");
+            System.out.println("+-----+--------------+----------------------+-----------+------------+------------+-----------------+");
+            long now = System.currentTimeMillis();
+            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
+                Reservation res = list.getEntry(i);
+                String guestName = res.getGuest() != null ? res.getGuest().getName() : res.getGuestId();
+                if (guestName.length() > 20) guestName = guestName.substring(0, 17) + "...";
+                
+                long waitMillis = now - res.getTimestamp();
+                long waitMinutes = waitMillis / (60 * 1000);
+                String waitStr = waitMinutes + " min ago";
+                if (waitMinutes > 60) {
+                    waitStr = (waitMinutes / 60) + " hrs ago";
+                }
+                
+                System.out.printf("| %-3d | %-12s | %-20s | %-9s | %-10s | %-10s | %-15s |%n",
+                        i, res.getConfirmationNo(), guestName, res.getRoomType(), res.getCheckInDate(), res.getCheckOutDate(), waitStr);
+            }
+            System.out.println("+-----+--------------+----------------------+-----------+------------+------------+-----------------+");
+        }
+        
+        System.out.println("=============================================================================");
+        System.out.println("  RESOURCE OPTIMIZATION & INVENTORY SHORTAGE ANALYSIS");
+        System.out.println("=============================================================================");
+        System.out.println("  Total Guests Waiting     : " + report.getTotalPending());
+        System.out.println("  Available Rooms in Stock : " + report.getAvailableRooms());
+        if (report.getShortage() > 0) {
+            System.out.println("  Inventory Shortage       : " + utility.UIUtils.RED + report.getShortage() + " room(s) missing" + utility.UIUtils.RESET);
+            System.out.println("  Action Recommendation    : Housekeeping should expedite cleaning, or offer upgrade/downgrade options.");
+        } else {
+            System.out.println("  Inventory Shortage       : " + utility.UIUtils.GREEN + "0 room(s) missing (Adequate supply)" + utility.UIUtils.RESET);
+            System.out.println("  Action Recommendation    : Assign rooms to waiting guests immediately.");
+        }
+        System.out.println("=============================================================================");
     }
 
     private int readInt() {
