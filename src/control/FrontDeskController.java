@@ -2,6 +2,7 @@ package control;
 
 import adt.BinarySearchTree;
 import adt.DoublyLinkedList;
+import adt.SortAlgorithms;
 import entity.BillingRecord;
 import entity.FrontDeskLog;
 import entity.Guest;
@@ -222,8 +223,7 @@ public class FrontDeskController {
             return false;
         }
 
-        if (!STATUS_PENDING.equals(reservation.getBookingStatus())
-                && !STATUS_CONFIRMED.equals(reservation.getBookingStatus())) {
+        if (!isCancellable(reservation)) {
             return false;
         }
 
@@ -283,19 +283,30 @@ public class FrontDeskController {
         return matches;
     }
 
-    /** Returns bookings that have not started and can still be cancelled. */
+    /** Returns allocated bookings that have not started and can still be cancelled. */
     public DoublyLinkedList<Reservation> getCancellableReservations() {
         DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation reservation = reservations.getEntry(i);
-            if (reservation != null
-                    && (STATUS_PENDING.equals(reservation.getBookingStatus())
-                    || STATUS_CONFIRMED.equals(reservation.getBookingStatus()))) {
+            if (reservation != null && isCancellable(reservation)) {
                 matches.add(reservation);
             }
         }
         return matches;
+    }
+
+    private boolean isCancellable(Reservation reservation) {
+        if (STATUS_CONFIRMED.equals(reservation.getBookingStatus())) {
+            return true;
+        }
+        return STATUS_PENDING.equals(reservation.getBookingStatus())
+                && hasAssignedRoom(reservation);
+    }
+
+    private boolean hasAssignedRoom(Reservation reservation) {
+        String roomNo = reservation.getAssignedRoomNo();
+        return roomNo != null && !roomNo.trim().isEmpty();
     }
 
     /** Returns reservations that still have an outstanding (UNPAID) bill. */
@@ -373,6 +384,126 @@ public class FrontDeskController {
 
     public DoublyLinkedList<BillingRecord> getBillingLog() {
         return billingLog;
+    }
+
+    /**
+     * Combines stored check-in, check-out, cancellation, and billing files
+     * into one list, then filters by room type, record status, and payment
+     * status. Matching rows are ranked with MergeSort.
+     */
+    public StoredFrontDeskReport generateStoredFrontDeskReport(
+            String roomType, String recordStatus, String paymentStatus) {
+        DoublyLinkedList<StoredFrontDeskRecord> combined = new DoublyLinkedList<>();
+        appendLogRecords(combined, checkInLog, "CHECK_IN");
+        appendLogRecords(combined, checkOutLog, "CHECK_OUT");
+        appendLogRecords(combined, cancellationLog, "CANCELLED");
+        appendBillingRecords(combined);
+
+        DoublyLinkedList<StoredFrontDeskRecord> matches = new DoublyLinkedList<>();
+        for (int i = 1; i <= combined.getNumberOfEntries(); i++) {
+            StoredFrontDeskRecord record = combined.getEntry(i);
+            if (record == null) {
+                continue;
+            }
+            if (!"ALL".equals(roomType) && !roomType.equalsIgnoreCase(safeText(record.getRoomType()))) {
+                continue;
+            }
+            if (!"ALL".equals(recordStatus)
+                    && !recordStatus.equalsIgnoreCase(safeText(record.getRecordStatus()))) {
+                continue;
+            }
+            if (!"ALL".equals(paymentStatus)
+                    && !paymentStatus.equalsIgnoreCase(safeText(record.getPaymentStatus()))) {
+                continue;
+            }
+            matches.add(record);
+        }
+
+        DoublyLinkedList<StoredFrontDeskRecord> sortedMatches = SortAlgorithms.mergeSort(matches,
+                (first, second) -> {
+                    int statusComparison = recordStatusOrder(first.getRecordStatus())
+                            - recordStatusOrder(second.getRecordStatus());
+                    if (statusComparison != 0) {
+                        return statusComparison;
+                    }
+                    int paymentComparison = safeText(first.getPaymentStatus())
+                            .compareTo(safeText(second.getPaymentStatus()));
+                    if (paymentComparison != 0) {
+                        return paymentComparison;
+                    }
+                    return safeText(first.getConfirmationNo())
+                            .compareTo(safeText(second.getConfirmationNo()));
+                });
+        return new StoredFrontDeskReport(roomType, recordStatus, paymentStatus, sortedMatches);
+    }
+
+    private void appendLogRecords(DoublyLinkedList<StoredFrontDeskRecord> destination,
+                                  DoublyLinkedList<FrontDeskLog> logs,
+                                  String recordStatus) {
+        for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
+            FrontDeskLog log = logs.getEntry(i);
+            if (log == null) {
+                continue;
+            }
+            String payment = log.getPaymentStatus() == null || log.getPaymentStatus().trim().isEmpty()
+                    ? PAYMENT_UNPAID : log.getPaymentStatus();
+            destination.add(new StoredFrontDeskRecord(
+                    log.getConfirmationNo(),
+                    log.getGuestId(),
+                    log.getGuestName(),
+                    log.getRoomNo(),
+                    log.getRoomType(),
+                    recordStatus,
+                    payment,
+                    log.getGrandTotal(),
+                    log.getLoggedAt()));
+        }
+    }
+
+    private void appendBillingRecords(DoublyLinkedList<StoredFrontDeskRecord> destination) {
+        for (int i = 1; i <= billingLog.getNumberOfEntries(); i++) {
+            BillingRecord bill = billingLog.getEntry(i);
+            if (bill == null) {
+                continue;
+            }
+            String recordStatus = toRecordStatus(bill.getBookingStatus());
+            String payment = bill.getPaymentStatus() == null || bill.getPaymentStatus().trim().isEmpty()
+                    ? PAYMENT_UNPAID : bill.getPaymentStatus();
+            destination.add(new StoredFrontDeskRecord(
+                    bill.getConfirmationNo(),
+                    bill.getGuestId(),
+                    bill.getGuestName(),
+                    bill.getRoomNo(),
+                    bill.getRoomType(),
+                    recordStatus,
+                    payment,
+                    bill.getGrandTotal(),
+                    bill.getRecordedAt()));
+        }
+    }
+
+    private String toRecordStatus(String bookingStatus) {
+        if (STATUS_CHECKED_IN.equalsIgnoreCase(bookingStatus)) {
+            return "CHECK_IN";
+        }
+        if (STATUS_CHECKED_OUT.equalsIgnoreCase(bookingStatus)) {
+            return "CHECK_OUT";
+        }
+        if (STATUS_CANCELLED.equalsIgnoreCase(bookingStatus)) {
+            return "CANCELLED";
+        }
+        return bookingStatus == null ? "" : bookingStatus.trim().toUpperCase();
+    }
+
+    private int recordStatusOrder(String recordStatus) {
+        if ("CHECK_IN".equalsIgnoreCase(recordStatus)) return 1;
+        if ("CHECK_OUT".equalsIgnoreCase(recordStatus)) return 2;
+        if ("CANCELLED".equalsIgnoreCase(recordStatus)) return 3;
+        return 4;
+    }
+
+    private String safeText(String value) {
+        return value == null ? "" : value.trim();
     }
 
     /**
@@ -697,5 +828,90 @@ public class FrontDeskController {
         public double getTaxRate() { return record.getTaxRate(); }
         public double getTaxAmount() { return record.getTaxAmount(); }
         public double getGrandTotal() { return record.getGrandTotal(); }
+    }
+
+    /** One combined row from stored check-in, check-out, cancellation, or billing files. */
+    public static class StoredFrontDeskRecord {
+        private final String confirmationNo;
+        private final String guestId;
+        private final String guestName;
+        private final String roomNo;
+        private final String roomType;
+        private final String recordStatus;
+        private final String paymentStatus;
+        private final double grandTotal;
+        private final String recordedAt;
+
+        private StoredFrontDeskRecord(String confirmationNo, String guestId,
+                                      String guestName, String roomNo, String roomType,
+                                      String recordStatus, String paymentStatus,
+                                      double grandTotal, String recordedAt) {
+            this.confirmationNo = confirmationNo;
+            this.guestId = guestId;
+            this.guestName = guestName;
+            this.roomNo = roomNo;
+            this.roomType = roomType;
+            this.recordStatus = recordStatus;
+            this.paymentStatus = paymentStatus;
+            this.grandTotal = grandTotal;
+            this.recordedAt = recordedAt;
+        }
+
+        public String getConfirmationNo() { return confirmationNo; }
+        public String getGuestId() { return guestId; }
+        public String getGuestName() { return guestName; }
+        public String getRoomNo() { return roomNo; }
+        public String getRoomType() { return roomType; }
+        public String getRecordStatus() { return recordStatus; }
+        public String getPaymentStatus() { return paymentStatus; }
+        public double getGrandTotal() { return grandTotal; }
+        public String getRecordedAt() { return recordedAt; }
+    }
+
+    /** Filter + MergeSort result for the combined stored front-desk files report. */
+    public static class StoredFrontDeskReport {
+        private final String roomType;
+        private final String recordStatus;
+        private final String paymentStatus;
+        private final DoublyLinkedList<StoredFrontDeskRecord> records;
+        private int checkInCount;
+        private int checkOutCount;
+        private int cancelledCount;
+        private int paidCount;
+        private int unpaidCount;
+
+        private StoredFrontDeskReport(String roomType, String recordStatus,
+                                      String paymentStatus,
+                                      DoublyLinkedList<StoredFrontDeskRecord> records) {
+            this.roomType = roomType;
+            this.recordStatus = recordStatus;
+            this.paymentStatus = paymentStatus;
+            this.records = records;
+            summarise();
+        }
+
+        private void summarise() {
+            for (int i = 1; i <= records.getNumberOfEntries(); i++) {
+                StoredFrontDeskRecord record = records.getEntry(i);
+                String status = record.getRecordStatus();
+                if ("CHECK_IN".equalsIgnoreCase(status)) checkInCount++;
+                else if ("CHECK_OUT".equalsIgnoreCase(status)) checkOutCount++;
+                else if ("CANCELLED".equalsIgnoreCase(status)) cancelledCount++;
+
+                if ("PAID".equalsIgnoreCase(record.getPaymentStatus())) paidCount++;
+                else unpaidCount++;
+            }
+        }
+
+        public String getRoomType() { return roomType; }
+        public String getRecordStatus() { return recordStatus; }
+        public String getPaymentStatus() { return paymentStatus; }
+        public DoublyLinkedList<StoredFrontDeskRecord> getRecords() { return records; }
+        public int getTotalRecords() { return records.getNumberOfEntries(); }
+        public int getCheckInCount() { return checkInCount; }
+        public int getCheckOutCount() { return checkOutCount; }
+        public int getCancelledCount() { return cancelledCount; }
+        public int getPaidCount() { return paidCount; }
+        public int getUnpaidCount() { return unpaidCount; }
     }
 }
