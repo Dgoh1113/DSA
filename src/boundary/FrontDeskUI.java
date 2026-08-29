@@ -62,6 +62,10 @@ public class FrontDeskUI {
                     viewStoredFrontDeskRecords();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
+                case 10:
+                    generateAllReservationReport();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;    
                 case 0:
                     exitToMainMenu = true;
                     break;
@@ -96,10 +100,13 @@ public class FrontDeskUI {
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET
                 + " Record Payment ");
 
-        utility.UIUtils.printSectionHeader("RESERVATION REPORT", utility.UIUtils.GREEN);
+        utility.UIUtils.printSectionHeader("REPORT & ANALYSIS", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET
                 + " Generate Front-Desk Report (Filter + Sort)");
 
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "10." + utility.UIUtils.RESET
+                + " Generate All Reservation Report");
+        
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET
                 + " Back to Main Menu");
@@ -497,6 +504,76 @@ public class FrontDeskUI {
                 + " | Cancelled: " + report.getCancelledCount());
         System.out.println("  Payment       : Paid=" + report.getPaidCount()
                 + " | Unpaid=" + report.getUnpaidCount());
+        System.out.println(
+                "+----------------------------------------------------------------------------------------------------------+");
+    }
+    
+    private void generateAllReservationReport() {
+        utility.UIUtils.printSubHeader("MODULE 3 > GENERATE ALL RESERVATION REPORT", utility.UIUtils.GREEN);
+        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+ 
+        System.out.println(
+                "\n+----------------------------------------------------------------------------------------------------------+");
+        System.out.println("                                   ALL RESERVATION REPORT");
+        System.out.println(
+                "+-----+--------------+----------------+--------+-----------+------------+------------+-----+-------------+");
+        System.out.println(
+                "| No. | Confirmation | Guest          | Room   | Type      | Check-In   | Check-Out  | Nts | Status      |");
+        System.out.println(
+                "+-----+--------------+----------------+--------+-----------+------------+------------+-----+-------------+");
+ 
+        int pending = 0, confirmed = 0, checkedIn = 0, checkedOut = 0, cancelled = 0;
+ 
+        for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
+            Reservation res = reservations.getEntry(i);
+            if (res == null) {
+                continue;
+            }
+            Guest guest = controller.findGuest(res.getGuestId());
+            String guestName = guest != null ? guest.getName() : res.getGuestId();
+            int nights = controller.calculateNights(res.getCheckInDate(), res.getCheckOutDate());
+ 
+            System.out.printf("| %-3d | %-12s | %-14s | %-6s | %-9s | %-10s | %-10s | %-3d | %-11s |%n",
+                    i,
+                    emptyDash(res.getConfirmationNo()),
+                    truncate(guestName, 14),
+                    emptyDash(res.getAssignedRoomNo()),
+                    emptyDash(res.getRoomType()),
+                    emptyDash(res.getCheckInDate()),
+                    emptyDash(res.getCheckOutDate()),
+                    nights,
+                    emptyDash(res.getBookingStatus()));
+ 
+            switch (emptyDash(res.getBookingStatus())) {
+                case "PENDING":
+                    pending++;
+                    break;
+                case "CONFIRMED":
+                    confirmed++;
+                    break;
+                case "CHECKED_IN":
+                    checkedIn++;
+                    break;
+                case "CHECKED_OUT":
+                    checkedOut++;
+                    break;
+                case "CANCELLED":
+                    cancelled++;
+                    break;
+                default:
+                    break;
+            }
+        }
+ 
+        if (reservations.isEmpty()) {
+            System.out.println(
+                    "|                        No reservations are currently in the system.                        |");
+        }
+        System.out.println(
+                "+-----+--------------+----------------+--------+-----------+------------+------------+-----+-------------+");
+        System.out.println("  Total Reservations: " + reservations.getNumberOfEntries());
+        System.out.printf("  Pending: %d | Confirmed: %d | Checked-In: %d | Checked-Out: %d | Cancelled: %d%n",
+                pending, confirmed, checkedIn, checkedOut, cancelled);
         System.out.println(
                 "+----------------------------------------------------------------------------------------------------------+");
     }

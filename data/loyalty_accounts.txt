@@ -1,7 +1,7 @@
 G1001|2000|STANDARD|2027-08-16|+200 pts (Stay: 1 nights @ $200.0/night)
 G1002|1000|SILVER|2027-08-16|+1000 pts (Stay: 2 nights @ $500.0/night);;;Tier upgrade: STANDARD -> SILVER
 G1003|3000|GOLD|2027-08-16|+3000 pts (Stay: 6 nights @ $500.0/night);;;Tier upgrade: STANDARD -> GOLD
-G1004|4400|PLATINUM|2027-08-16|+3000 pts (Stay: 6 nights @ $500.0/night);;;Tier upgrade: STANDARD -> PLATINUM;;;+1400 pts (Stay: 7 nights @ $200.0/night)
+G1004|2600|GOLD|2027-08-29|+3000 pts (Stay: 6 nights @ $500.0/night);;;Tier upgrade: STANDARD -> PLATINUM;;;+1400 pts (Stay: 7 nights @ $200.0/night);;;-800 pts (Redeemed: Late Checkout (Conf #10000023: 2026-09-24 -> 2026-09-25));;;Tier upgrade: PLATINUM -> GOLD;;;-800 pts (Redeemed: Late Checkout (Conf #10000031: 2026-08-31 -> 2026-09-01));;;-800 pts (Late Check-Out Penalty: 1 day(s) late, Conf #10000031);;;+600 pts (Stay: 3 nights @ $200.0/night)
 G1005|16500|DIAMOND|2027-08-19|Initial Seed Points;;;-500 pts (Redeemed: Room Upgrade);;;-500 pts (Redeemed: Room Upgrade (DELUXE -> SUITE));;;+5500 pts (Stay: 11 nights @ $500.0/night)
 G1006|250|STANDARD|2027-08-16|+250 pts (DELUXE room stay)
 G1007|2000|SILVER|2027-08-16|+2000 pts (Stay: 4 nights @ $500.0/night);;;Tier upgrade: STANDARD -> SILVER
