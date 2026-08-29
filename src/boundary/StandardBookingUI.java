@@ -6,11 +6,7 @@ import entity.Guest;
 import entity.Reservation;
 import java.util.Scanner;
 
-/**
- * Boundary: Standard Booking UI (Module 1).
- * Console forms for walk-in registrations and standard booking queue operations.
- * All System.out / Scanner interactions live here — no business logic.
- */
+
 public class StandardBookingUI {
 
     private StandardBookingController controller;

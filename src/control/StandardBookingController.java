@@ -22,6 +22,10 @@ import java.time.LocalDate;
  * - dequeue() assigns the next available standard room in O(1).
  * - When a room becomes available and the VIP heap is empty, the system
  *   falls back here to serve the longest-waiting standard guest.
+ *
+ * @author Student Name: Damien Goh Kun Xuan 
+ * Date: 29/8/2026
+ * Admin No: 261WMR3129
  */
 public class StandardBookingController {
 
