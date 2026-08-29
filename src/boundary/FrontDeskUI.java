@@ -383,7 +383,7 @@ public class FrontDeskUI {
     }
 
     private void queryBillingDetails() {
-        utility.UIUtils.printSubHeader("MODULE 3 > QUERY BILLING DETAILS", utility.UIUtils.GREEN);
+        utility.UIUtils.printSubHeader("MODULE 3 > VIEW BILLING DETAILS", utility.UIUtils.GREEN);
         DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
         if (reservations.isEmpty()) {
             System.out.println("No reservations are currently available to query.");
