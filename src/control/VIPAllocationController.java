@@ -10,18 +10,22 @@ import entity.Reservation;
 import entity.Room;
 
 /**
+ * @author Law Joey
  * Controller: Module 2 — VIP & Loyalty Tier Priority Room Allocation.
  * Handles all Binary Max-Heap operations for VIP priority scheduling.
  *
  * Business Rules:
  * - High-tier members (SILVER, GOLD, PLATINUM, DIAMOND) bypass standard waitlists.
- * - Priority Score = (Tier Weight × 10000) + Urgency Factor − Arrival Order Index
+ * - Priority is determined by loyalty tier first, loyalty points second,
+ *   and arrival order as the final tie-breaker.
  * - Binary Max-Heap guarantees highest priority guest at root — O(1) peek.
  * - Insertion (sift-up) and extraction (sift-down) in O(log n).
  * - When rooms become available, extractMax() removes the highest-ranked VIP first.
  *
- * A wrapper class VIPReservation implements Comparable based on priorityScore
- * so the Max-Heap can order reservations by VIP priority.
+ * Priority Score =
+ * (Tier Weight × 1,000,000)
+ * + (Loyalty Points × 10)
+ * + (100,000 − Arrival Order Index)
  */
 public class VIPAllocationController {
 
@@ -107,9 +111,11 @@ public class VIPAllocationController {
         reservation.setGuest(guest);
         reservation.setBookingStatus("PENDING");
 
-        // Calculate priority score
+        // Calculate priority score: tier first, then points, then arrival time as final tie-breaker
         int arrivalIndex = StandardBookingController.getNextArrivalIndex();
-        int priorityScore = calculatePriorityScore(guest.getTierWeight(), arrivalIndex);
+        Integer currentPoints = getCurrentPointsByGuestId(guest.getGuestId());
+        int loyaltyPoints = currentPoints == null ? 0 : currentPoints.intValue();
+        int priorityScore = calculatePriorityScore(guest.getTierWeight(), loyaltyPoints, arrivalIndex);
         reservation.setPriorityScore(priorityScore);
 
         // Wrap and insert into Max-Heap
@@ -460,17 +466,21 @@ public class VIPAllocationController {
     }
 
     /**
-     * Calculates the priority score using the formula:
-     * Priority Score = (Tier Weight × 10000) + Urgency Factor − Arrival Order Index
+     * Calculates the VIP priority score using the business rule:
+     * 1) Higher loyalty tier has stronger priority.
+     * 2) For the same tier, higher loyalty points rank higher.
+     * 3) Earlier arrival is used only as the final tie-breaker.
      *
-     * Urgency Factor is set to 5000 as a baseline (can be adjusted based on
-     * check-in date proximity in future enhancements).
+     * The score is intentionally structured so tier and points dominate,
+     * while arrival index only breaks ties within the same tier/points bucket.
      */
-    public int calculatePriorityScore(int tierWeight, int arrivalIndex) {
-        int urgencyFactor = 5000; // Baseline urgency
-        return (tierWeight * 10000) + urgencyFactor - arrivalIndex;
+    public int calculatePriorityScore(int tierWeight, int loyaltyPoints, int arrivalIndex) {
+        return (tierWeight * 1_000_000) + (loyaltyPoints * 10) + (100_000 - arrivalIndex);
     }
 
+    /**
+     * @author Law Joey
+     */
     public static class PriorityQueueSummary {
         private int pendingCount;
         private int highestPriorityScore;
@@ -527,6 +537,9 @@ public class VIPAllocationController {
         }
     }
 
+    /**
+     * @author Law Joey
+     */
     public static class VIPAllocationEfficiencyRow {
         private final String roomType;
         private int requests;
@@ -567,6 +580,9 @@ public class VIPAllocationController {
         }
     }
 
+    /**
+     * @author Law Joey
+     */
     public static class VIPAllocationEfficiencyReport {
         private final String minimumTier;
         private final String roomType;
@@ -596,6 +612,9 @@ public class VIPAllocationController {
         public DoublyLinkedList<VIPAllocationEfficiencyRow> getRows() { return rows; }
     }
 
+    /**
+     * @author Law Joey
+     */
     public static class AllocationPerformanceReport {
         private final String minimumTier;
         private final String roomType;
@@ -649,7 +668,10 @@ public class VIPAllocationController {
         }
     }
 
-    /** Management-ready result for the multi-criteria VIP demand report. */
+    /**
+     * Management-ready result for the multi-criteria VIP demand report.
+     * @author Law Joey
+     */
     public static class VIPAllocationDemandReport {
         private final String minimumTier;
         private final String roomType;
@@ -732,6 +754,7 @@ public class VIPAllocationController {
      * for use in the Binary Max-Heap (CustomPriorityQueue).
      *
      * Higher priorityScore = higher priority (Max-Heap root).
+     * @author Law Joey
      */
     public static class VIPReservation implements Comparable<VIPReservation> {
 

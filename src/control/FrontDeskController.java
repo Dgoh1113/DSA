@@ -15,15 +15,10 @@ import java.time.temporal.ChronoUnit;
 import utility.FilePersistenceUtils;
 
 /**
- * Controller: Module 3 — Front-Desk Service.
- * Handles BST searching, check-in/check-out, billing, and reservation management.
- *
- * Business Rules:
- * - Front-desk agents search reservations by 8-digit confirmationNo.
- * - BST search traverses left/right based on numeric comparison — O(log n) average.
- * - In-order traversal prints sorted booking logs efficiently.
- * Receives shared ADT instances from Main.java.
+ * @author Jude Wong Kah Chung
+ * Controller Enhancement: Module 3 — Front-Desk Service.
  */
+
 public class FrontDeskController {
 
     private static final String STATUS_PENDING = "PENDING";
@@ -40,6 +35,10 @@ public class FrontDeskController {
     private static final String BILL_FINAL = "FINAL";
     private static final String BILL_VOID = "VOID";
     private static final double TAX_RATE = 0.06;
+    private static final int LATE_CHECKOUT_POINTS_PER_DAY = 800;
+    private static final double LATE_CHECKOUT_DAILY_FEE_SURCHARGE = 50.0;
+    private static final String PENALTY_TYPE_POINTS = "POINTS";
+    private static final String PENALTY_TYPE_FEE = "FEE";
 
     private BinarySearchTree<Reservation> searchTree;
     private DoublyLinkedList<Guest> guestRegistry;
@@ -50,15 +49,16 @@ public class FrontDeskController {
     private DoublyLinkedList<FrontDeskLog> checkOutLog;
     private DoublyLinkedList<FrontDeskLog> cancellationLog;
     private DoublyLinkedList<BillingRecord> billingLog;
+    private DoublyLinkedList<LateCheckoutPenalty> lateCheckoutPenaltyLog = new DoublyLinkedList<>();
 
     public FrontDeskController(BinarySearchTree<Reservation> searchTree,
-                               DoublyLinkedList<Guest> guestRegistry,
-                               DoublyLinkedList<Room> roomInventory,
-                               LoyaltyController loyaltyController,
-                               DoublyLinkedList<FrontDeskLog> checkInLog,
-                               DoublyLinkedList<FrontDeskLog> checkOutLog,
-                               DoublyLinkedList<FrontDeskLog> cancellationLog,
-                               DoublyLinkedList<BillingRecord> billingLog) {
+            DoublyLinkedList<Guest> guestRegistry,
+            DoublyLinkedList<Room> roomInventory,
+            LoyaltyController loyaltyController,
+            DoublyLinkedList<FrontDeskLog> checkInLog,
+            DoublyLinkedList<FrontDeskLog> checkOutLog,
+            DoublyLinkedList<FrontDeskLog> cancellationLog,
+            DoublyLinkedList<BillingRecord> billingLog) {
         this.searchTree = searchTree;
         this.guestRegistry = guestRegistry;
         this.roomInventory = roomInventory;
@@ -73,25 +73,12 @@ public class FrontDeskController {
         this.undoController = undoController;
     }
 
-    /**
-     * Creates a dummy Reservation with the given confirmationNo for comparison.
-     * Average O(log n) time complexity.
-     *
-     * @param confirmationNo The 8-digit confirmation number to search for.
-     * @return The matching Reservation, or null if not found.
-     */
     public Reservation searchReservation(String confirmationNo) {
         Reservation searchKey = new Reservation();
         searchKey.setConfirmationNo(confirmationNo);
         return searchTree.search(searchKey);
     }
 
-    /**
-     * Checks in a guest: marks reservation as CHECKED_IN and room as OCCUPIED.
-     *
-     * @param confirmationNo The 8-digit confirmation number.
-     * @return true if check-in was successful, false if reservation not found or invalid state.
-     */
     public boolean checkIn(String confirmationNo) {
         Reservation reservation = searchReservation(confirmationNo);
         if (reservation == null) {
@@ -99,7 +86,7 @@ public class FrontDeskController {
         }
 
         if (!STATUS_CONFIRMED.equals(reservation.getBookingStatus())) {
-            return false; // Can only check in from CONFIRMED status
+            return false;
         }
 
         if (!isCheckInDateReached(reservation.getCheckInDate())) {
@@ -120,44 +107,36 @@ public class FrontDeskController {
 
         if (undoController != null) {
             undoController.recordAction(
-                "CHECK_IN",
-                "Module 3: Front-Desk Service",
-                "Check-In Conf #" + confirmationNo + " (Room " + reservation.getAssignedRoomNo() + ")",
-                () -> {
-                    reservation.setBookingStatus(STATUS_CONFIRMED);
-                    room.setStatus(previousRoomStatus != null ? previousRoomStatus : ROOM_OCCUPIED);
-                    persistFrontDeskData();
-                }
-            );
+                    "CHECK_IN",
+                    "Module 3: Front-Desk Service",
+                    "Check-In Conf #" + confirmationNo + " (Room " + reservation.getAssignedRoomNo() + ")",
+                    () -> {
+                        reservation.setBookingStatus(STATUS_CONFIRMED);
+                        room.setStatus(previousRoomStatus != null ? previousRoomStatus : ROOM_OCCUPIED);
+                        persistFrontDeskData();
+                    });
         }
 
         persistFrontDeskData();
         return true;
     }
 
-    /**
-     * Checks out a guest without changing payment status.
-     */
     public Reservation checkOut(String confirmationNo) {
         return checkOut(confirmationNo, false);
     }
 
-    /**
-     * Checks out a guest: marks reservation as CHECKED_OUT, frees room,
-     * records payment if received, and triggers loyalty points accrual.
-     *
-     * @param confirmationNo The 8-digit confirmation number.
-     * @param paymentReceived true when the guest has settled the bill at check-out.
-     * @return The check-out Reservation, or null if not found or invalid state.
-     */
     public Reservation checkOut(String confirmationNo, boolean paymentReceived) {
+        return checkOut(confirmationNo, paymentReceived, getSuggestedDaysLate(confirmationNo));
+    }
+
+    public Reservation checkOut(String confirmationNo, boolean paymentReceived, int daysLate) {
         Reservation reservation = searchReservation(confirmationNo);
         if (reservation == null) {
             return null;
         }
 
         if (!STATUS_CHECKED_IN.equals(reservation.getBookingStatus())) {
-            return null; // Can only check out from CHECKED_IN status
+            return null;
         }
 
         String previousPayment = reservation.getPaymentStatus();
@@ -172,6 +151,7 @@ public class FrontDeskController {
         Guest guest = findGuest(reservation.getGuestId());
         int nights = calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate());
         int pointsAwarded = 0;
+        LateCheckoutPenalty appliedPenalty = evaluateAndApplyLateCheckoutPenalty(reservation, room, guest, daysLate);
 
         if (room != null) {
             room.setStatus(ROOM_AVAILABLE);
@@ -179,7 +159,7 @@ public class FrontDeskController {
             if (loyaltyController != null && guest != null) {
                 pointsAwarded = (int) (room.getNightlyRate() * nights);
                 loyaltyController.accruePointsByContactNo(guest.getContactNo(),
-                                                          room.getNightlyRate(), nights);
+                        room.getNightlyRate(), nights);
             }
         }
 
@@ -192,31 +172,25 @@ public class FrontDeskController {
 
         if (undoController != null) {
             undoController.recordAction(
-                "CHECK_OUT",
-                "Module 3: Front-Desk Service",
-                "Check-Out Conf #" + confirmationNo + " (Room " + reservation.getAssignedRoomNo() + ")",
-                () -> {
-                    reservation.setBookingStatus(STATUS_CHECKED_IN);
-                    reservation.setPaymentStatus(previousPayment);
-                    if (room != null) {
-                        room.setStatus(ROOM_OCCUPIED);
-                    }
-                    reverseAccruedPoints(checkedOutGuest, pointsToReverse, confirmationNo);
-                    persistFrontDeskData();
-                }
-            );
+                    "CHECK_OUT",
+                    "Module 3: Front-Desk Service",
+                    "Check-Out Conf #" + confirmationNo + " (Room " + reservation.getAssignedRoomNo() + ")",
+                    () -> {
+                        reservation.setBookingStatus(STATUS_CHECKED_IN);
+                        reservation.setPaymentStatus(previousPayment);
+                        if (room != null) {
+                            room.setStatus(ROOM_OCCUPIED);
+                        }
+                        reverseAccruedPoints(checkedOutGuest, pointsToReverse, confirmationNo);
+                        reverseLateCheckoutPenalty(appliedPenalty, checkedOutGuest, confirmationNo);
+                        persistFrontDeskData();
+                    });
         }
 
         persistFrontDeskData();
         return reservation;
     }
 
-    /**
-     * Cancels a reservation.
-     *
-     * @param confirmationNo The confirmation number to cancel.
-     * @return true if cancellation was successful.
-     */
     public boolean cancelReservation(String confirmationNo) {
         Reservation reservation = searchReservation(confirmationNo);
         if (reservation == null) {
@@ -241,36 +215,31 @@ public class FrontDeskController {
 
         if (undoController != null) {
             undoController.recordAction(
-                "CANCEL_RESERVATION",
-                "Module 3: Front-Desk Service",
-                "Cancelled Conf #" + confirmationNo,
-                () -> {
-                    reservation.setBookingStatus(prevStatus);
-                    if (room != null && STATUS_CONFIRMED.equals(prevStatus)
-                            && ROOM_AVAILABLE.equals(room.getStatus())) {
-                        room.setStatus(previousRoomStatus != null ? previousRoomStatus : ROOM_OCCUPIED);
-                    }
-                    persistFrontDeskData();
-                }
-            );
+                    "CANCEL_RESERVATION",
+                    "Module 3: Front-Desk Service",
+                    "Cancelled Conf #" + confirmationNo,
+                    () -> {
+                        reservation.setBookingStatus(prevStatus);
+                        if (room != null && STATUS_CONFIRMED.equals(prevStatus)
+                                && ROOM_AVAILABLE.equals(room.getStatus())) {
+                            room.setStatus(previousRoomStatus != null ? previousRoomStatus : ROOM_OCCUPIED);
+                        }
+                        persistFrontDeskData();
+                    });
         }
 
         persistFrontDeskData();
         return true;
     }
 
-    /**
-     * Returns all reservations in sorted order via BST in-order traversal.
-     * Used for printing sorted booking logs.
-     */
     public DoublyLinkedList<Reservation> getAllReservationsSorted() {
         return searchTree.inOrderTraversal();
     }
 
-    /** Returns reservations matching a booking status, sorted by confirmation number. */
     public DoublyLinkedList<Reservation> getReservationsByStatus(String bookingStatus) {
         DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
-        if (bookingStatus == null) return matches;
+        if (bookingStatus == null)
+            return matches;
 
         DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
@@ -283,7 +252,6 @@ public class FrontDeskController {
         return matches;
     }
 
-    /** Returns allocated bookings that have not started and can still be cancelled. */
     public DoublyLinkedList<Reservation> getCancellableReservations() {
         DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
@@ -326,9 +294,6 @@ public class FrontDeskController {
         return matches;
     }
 
-    /**
-     * Builds a live billing snapshot for the given confirmation number.
-     */
     public BillingDetails queryBillingDetails(String confirmationNo) {
         Reservation reservation = searchReservation(confirmationNo);
         if (reservation == null) {
@@ -337,9 +302,6 @@ public class FrontDeskController {
         return buildBillingDetails(reservation);
     }
 
-    /**
-     * Marks a reservation bill as PAID and refreshes the stored billing snapshot.
-     */
     public boolean recordPayment(String confirmationNo) {
         Reservation reservation = searchReservation(confirmationNo);
         if (reservation == null || STATUS_CANCELLED.equals(reservation.getBookingStatus())) {
@@ -355,15 +317,14 @@ public class FrontDeskController {
 
         if (undoController != null) {
             undoController.recordAction(
-                "RECORD_PAYMENT",
-                "Module 3: Front-Desk Service",
-                "Recorded payment Conf #" + confirmationNo,
-                () -> {
-                    reservation.setPaymentStatus(previousPayment != null ? previousPayment : PAYMENT_UNPAID);
-                    upsertBillingSnapshot(reservation);
-                    persistFrontDeskData();
-                }
-            );
+                    "RECORD_PAYMENT",
+                    "Module 3: Front-Desk Service",
+                    "Recorded payment Conf #" + confirmationNo,
+                    () -> {
+                        reservation.setPaymentStatus(previousPayment != null ? previousPayment : PAYMENT_UNPAID);
+                        upsertBillingSnapshot(reservation);
+                        persistFrontDeskData();
+                    });
         }
 
         persistFrontDeskData();
@@ -386,13 +347,24 @@ public class FrontDeskController {
         return billingLog;
     }
 
-    /**
-     * Combines stored check-in, check-out, cancellation, and billing files
-     * into one list, then filters by room type, record status, and payment
-     * status. Matching rows are ranked with MergeSort.
-     */
+    public static final String sort_field_default = "DEFAULT";
+    public static final String sort_field_confirmation_no = "CONFIRMATION_NO";
+    public static final String sort_field_room_no = "ROOM_NO";
+    public static final String sort_field_total = "TOTAL";
+
+    public static final String sort_direction_default = "DEFAULT";
+    public static final String sort_direction_asc = "ASC";
+    public static final String sort_direction_desc = "DESC";
+
     public StoredFrontDeskReport generateStoredFrontDeskReport(
             String roomType, String recordStatus, String paymentStatus) {
+        return generateStoredFrontDeskReport(roomType, recordStatus, paymentStatus,
+                sort_field_default, sort_direction_default);
+    }
+
+    public StoredFrontDeskReport generateStoredFrontDeskReport(
+            String roomType, String recordStatus, String paymentStatus,
+            String sortField, String sortDirection) {
         DoublyLinkedList<StoredFrontDeskRecord> combined = new DoublyLinkedList<>();
         appendLogRecords(combined, checkInLog, "CHECK_IN");
         appendLogRecords(combined, checkOutLog, "CHECK_OUT");
@@ -420,33 +392,61 @@ public class FrontDeskController {
         }
 
         DoublyLinkedList<StoredFrontDeskRecord> sortedMatches = SortAlgorithms.mergeSort(matches,
-                (first, second) -> {
-                    int statusComparison = recordStatusOrder(first.getRecordStatus())
-                            - recordStatusOrder(second.getRecordStatus());
-                    if (statusComparison != 0) {
-                        return statusComparison;
-                    }
-                    int paymentComparison = safeText(first.getPaymentStatus())
-                            .compareTo(safeText(second.getPaymentStatus()));
-                    if (paymentComparison != 0) {
-                        return paymentComparison;
-                    }
-                    return safeText(first.getConfirmationNo())
-                            .compareTo(safeText(second.getConfirmationNo()));
-                });
+                buildReportComparator(sortField, sortDirection));
         return new StoredFrontDeskReport(roomType, recordStatus, paymentStatus, sortedMatches);
     }
 
+    private SortAlgorithms.SortComparator<StoredFrontDeskRecord> buildReportComparator(
+            String sortField, String sortDirection) {
+        if (sort_direction_default.equalsIgnoreCase(sortDirection) || sortDirection == null) {
+            return defaultComparator();
+        }
+
+        final int directionMultiplier = sort_direction_desc.equalsIgnoreCase(sortDirection) ? -1 : 1;
+
+        if (sort_field_confirmation_no.equalsIgnoreCase(sortField)) {
+            return (first, second) -> directionMultiplier
+                    * safeText(first.getConfirmationNo()).compareTo(safeText(second.getConfirmationNo()));
+        }
+        if (sort_field_room_no.equalsIgnoreCase(sortField)) {
+            return (first, second) -> directionMultiplier
+                    * safeText(first.getRoomNo()).compareTo(safeText(second.getRoomNo()));
+        }
+        if (sort_field_total.equalsIgnoreCase(sortField)) {
+            return (first, second) -> directionMultiplier
+                    * Double.compare(first.getGrandTotal(), second.getGrandTotal());
+        }
+        return defaultComparator();
+    }
+
+    private SortAlgorithms.SortComparator<StoredFrontDeskRecord> defaultComparator() {
+        return (first, second) -> {
+            int statusComparison = recordStatusOrder(first.getRecordStatus())
+                    - recordStatusOrder(second.getRecordStatus());
+            if (statusComparison != 0) {
+                return statusComparison;
+            }
+            int paymentComparison = safeText(first.getPaymentStatus())
+                    .compareTo(safeText(second.getPaymentStatus()));
+            if (paymentComparison != 0) {
+                return paymentComparison;
+            }
+            return safeText(first.getConfirmationNo())
+                    .compareTo(safeText(second.getConfirmationNo()));
+        };
+    }
+
     private void appendLogRecords(DoublyLinkedList<StoredFrontDeskRecord> destination,
-                                  DoublyLinkedList<FrontDeskLog> logs,
-                                  String recordStatus) {
+            DoublyLinkedList<FrontDeskLog> logs,
+            String recordStatus) {
         for (int i = 1; i <= logs.getNumberOfEntries(); i++) {
             FrontDeskLog log = logs.getEntry(i);
             if (log == null) {
                 continue;
             }
             String payment = log.getPaymentStatus() == null || log.getPaymentStatus().trim().isEmpty()
-                    ? PAYMENT_UNPAID : log.getPaymentStatus();
+                    ? PAYMENT_UNPAID
+                    : log.getPaymentStatus();
             destination.add(new StoredFrontDeskRecord(
                     log.getConfirmationNo(),
                     log.getGuestId(),
@@ -468,7 +468,8 @@ public class FrontDeskController {
             }
             String recordStatus = toRecordStatus(bill.getBookingStatus());
             String payment = bill.getPaymentStatus() == null || bill.getPaymentStatus().trim().isEmpty()
-                    ? PAYMENT_UNPAID : bill.getPaymentStatus();
+                    ? PAYMENT_UNPAID
+                    : bill.getPaymentStatus();
             destination.add(new StoredFrontDeskRecord(
                     bill.getConfirmationNo(),
                     bill.getGuestId(),
@@ -496,9 +497,12 @@ public class FrontDeskController {
     }
 
     private int recordStatusOrder(String recordStatus) {
-        if ("CHECK_IN".equalsIgnoreCase(recordStatus)) return 1;
-        if ("CHECK_OUT".equalsIgnoreCase(recordStatus)) return 2;
-        if ("CANCELLED".equalsIgnoreCase(recordStatus)) return 3;
+        if ("CHECK_IN".equalsIgnoreCase(recordStatus))
+            return 1;
+        if ("CHECK_OUT".equalsIgnoreCase(recordStatus))
+            return 2;
+        if ("CANCELLED".equalsIgnoreCase(recordStatus))
+            return 3;
         return 4;
     }
 
@@ -506,10 +510,6 @@ public class FrontDeskController {
         return value == null ? "" : value.trim();
     }
 
-    /**
-     * Reconstructs stored front-desk files from live reservations when the
-     * log lists were loaded empty (for example after an older data set).
-     */
     public void backfillStoredRecordsIfEmpty() {
         DoublyLinkedList<Reservation> reservations = searchTree.inOrderTraversal();
         boolean fillCheckIns = checkInLog.isEmpty();
@@ -543,16 +543,10 @@ public class FrontDeskController {
         persistFrontDeskData();
     }
 
-    /**
-     * Returns the total number of reservations in the BST.
-     */
     public int getReservationCount() {
         return searchTree.size();
     }
 
-    /**
-     * Finds a guest by guestId in the guest registry.
-     */
     public Guest findGuest(String guestId) {
         for (int i = 1; i <= guestRegistry.getNumberOfEntries(); i++) {
             Guest guest = guestRegistry.getEntry(i);
@@ -563,11 +557,9 @@ public class FrontDeskController {
         return null;
     }
 
-    /**
-     * Finds a room by room number in the inventory.
-     */
     public Room findRoom(String roomNo) {
-        if (roomNo == null) return null;
+        if (roomNo == null)
+            return null;
         for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
             Room room = roomInventory.getEntry(i);
             if (room.getRoomNo().equals(roomNo)) {
@@ -577,19 +569,14 @@ public class FrontDeskController {
         return null;
     }
 
-    /**
-     * Gets all rooms and their current status.
-     */
     public DoublyLinkedList<Room> getRoomInventory() {
         return roomInventory;
     }
 
-    /** Returns true when the confirmation number is an 8-digit value. */
     public boolean isValidConfirmationNo(String confirmationNo) {
         return confirmationNo != null && confirmationNo.matches("\\d{8}");
     }
 
-    /** Returns true when today's date is on or after the booked check-in date. */
     public boolean isCheckInDateReached(String checkInDate) {
         LocalDate parsed = parseDate(checkInDate);
         if (parsed == null) {
@@ -598,10 +585,6 @@ public class FrontDeskController {
         return !LocalDate.now().isBefore(parsed);
     }
 
-    /**
-     * Night calculation from date strings (format: YYYY-MM-DD).
-     * Uses calendar dates so month and year boundaries are counted correctly.
-     */
     public int calculateNights(String checkIn, String checkOut) {
         LocalDate inDate = parseDate(checkIn);
         LocalDate outDate = parseDate(checkOut);
@@ -623,10 +606,6 @@ public class FrontDeskController {
         }
     }
 
-    /**
-     * Reverses points credited at check-out using LoyaltyController public APIs
-     * without changing Module 4 source.
-     */
     private void reverseAccruedPoints(Guest guest, int pointsAwarded, String confirmationNo) {
         if (loyaltyController == null || guest == null || pointsAwarded <= 0) {
             return;
@@ -657,13 +636,21 @@ public class FrontDeskController {
         String bookingStatus = reservation.getBookingStatus();
         String billStatus = STATUS_CANCELLED.equals(bookingStatus) ? BILL_VOID
                 : STATUS_CHECKED_OUT.equals(bookingStatus) ? BILL_FINAL
-                : BILL_OPEN;
+                        : BILL_OPEN;
         String paymentStatus = reservation.getPaymentStatus() == null || reservation.getPaymentStatus().trim().isEmpty()
-                ? PAYMENT_UNPAID : reservation.getPaymentStatus();
+                ? PAYMENT_UNPAID
+                : reservation.getPaymentStatus();
+        LateCheckoutPenalty penalty = findLateCheckoutPenalty(reservation.getConfirmationNo());
+        double penaltyFeeAmount = 0.0;
+        if (penalty != null && PENALTY_TYPE_FEE.equals(penalty.getPenaltyType()) && !BILL_VOID.equals(billStatus)) {
+            penaltyFeeAmount = penalty.getFeeAmount();
+            grandTotal += penaltyFeeAmount;
+        }
         if (BILL_VOID.equals(billStatus)) {
             grandTotal = 0.0;
             taxAmount = 0.0;
             discountAmount = 0.0;
+            penaltyFeeAmount = 0.0;
         }
 
         BillingRecord record = new BillingRecord();
@@ -687,7 +674,7 @@ public class FrontDeskController {
         record.setPaymentStatus(paymentStatus);
         record.setBookingStatus(bookingStatus);
         record.setRecordedAt(nowStamp());
-        return new BillingDetails(record);
+        return new BillingDetails(record, penalty);
     }
 
     private double discountRateForTier(String tier) {
@@ -706,6 +693,105 @@ public class FrontDeskController {
             default:
                 return 0.0;
         }
+    }
+
+    private LateCheckoutPenalty evaluateAndApplyLateCheckoutPenalty(Reservation reservation, Room room, Guest guest,
+            int daysLate) {
+        if (daysLate <= 0) {
+            removeLateCheckoutPenalty(reservation.getConfirmationNo());
+            return null;
+        }
+
+        int pointsRequired = daysLate * LATE_CHECKOUT_POINTS_PER_DAY;
+        LoyaltyAccount account = (loyaltyController != null && guest != null)
+                ? loyaltyController.findAccount(guest.getGuestId())
+                : null;
+
+        LateCheckoutPenalty penalty;
+        if (account != null && account.getTotalPoints() >= pointsRequired) {
+            account.setTotalPoints(account.getTotalPoints() - pointsRequired);
+            account.addHistoryEntry("-" + pointsRequired + " pts (Late Check-Out Penalty: "
+                    + daysLate + " day(s) late, Conf #" + reservation.getConfirmationNo() + ")");
+            loyaltyController.checkAndUpgradeTier(guest.getGuestId());
+            penalty = new LateCheckoutPenalty(reservation.getConfirmationNo(), daysLate,
+                    PENALTY_TYPE_POINTS, pointsRequired, 0.0, nowStamp());
+        } else {
+            double nightlyRate = room != null ? room.getNightlyRate() : 0.0;
+            double feeAmount = daysLate * (nightlyRate + LATE_CHECKOUT_DAILY_FEE_SURCHARGE);
+            penalty = new LateCheckoutPenalty(reservation.getConfirmationNo(), daysLate,
+                    PENALTY_TYPE_FEE, 0, feeAmount, nowStamp());
+        }
+
+        upsertLateCheckoutPenalty(penalty);
+        return penalty;
+    }
+
+    /**
+     * Undoes a previously applied late check-out penalty (refunds points if that
+     * was the penalty type).
+     */
+    private void reverseLateCheckoutPenalty(LateCheckoutPenalty penalty, Guest guest, String confirmationNo) {
+        if (penalty == null) {
+            return;
+        }
+        if (PENALTY_TYPE_POINTS.equals(penalty.getPenaltyType()) && loyaltyController != null && guest != null) {
+            LoyaltyAccount account = loyaltyController.findAccount(guest.getGuestId());
+            if (account != null) {
+                account.setTotalPoints(account.getTotalPoints() + penalty.getPointsDeducted());
+                account.addHistoryEntry("+" + penalty.getPointsDeducted()
+                        + " pts (Undo Late Check-Out Penalty Conf #" + confirmationNo + ")");
+                loyaltyController.checkAndUpgradeTier(guest.getGuestId());
+            }
+        }
+        removeLateCheckoutPenalty(confirmationNo);
+    }
+
+    public int getSuggestedDaysLate(String confirmationNo) {
+        Reservation reservation = searchReservation(confirmationNo);
+        if (reservation == null) {
+            return 0;
+        }
+        return calculateDaysLate(reservation.getCheckOutDate());
+    }
+
+    private int calculateDaysLate(String bookedCheckOutDate) {
+        LocalDate booked = parseDate(bookedCheckOutDate);
+        if (booked == null) {
+            return 0;
+        }
+        long daysLate = ChronoUnit.DAYS.between(booked, LocalDate.now());
+        return daysLate > 0 ? (int) daysLate : 0;
+    }
+
+    private void upsertLateCheckoutPenalty(LateCheckoutPenalty penalty) {
+        for (int i = 1; i <= lateCheckoutPenaltyLog.getNumberOfEntries(); i++) {
+            LateCheckoutPenalty existing = lateCheckoutPenaltyLog.getEntry(i);
+            if (existing != null && existing.getConfirmationNo().equals(penalty.getConfirmationNo())) {
+                lateCheckoutPenaltyLog.remove(i);
+                break;
+            }
+        }
+        lateCheckoutPenaltyLog.add(penalty);
+    }
+
+    private void removeLateCheckoutPenalty(String confirmationNo) {
+        for (int i = 1; i <= lateCheckoutPenaltyLog.getNumberOfEntries(); i++) {
+            LateCheckoutPenalty existing = lateCheckoutPenaltyLog.getEntry(i);
+            if (existing != null && existing.getConfirmationNo().equals(confirmationNo)) {
+                lateCheckoutPenaltyLog.remove(i);
+                return;
+            }
+        }
+    }
+
+    private LateCheckoutPenalty findLateCheckoutPenalty(String confirmationNo) {
+        for (int i = 1; i <= lateCheckoutPenaltyLog.getNumberOfEntries(); i++) {
+            LateCheckoutPenalty existing = lateCheckoutPenaltyLog.getEntry(i);
+            if (existing != null && existing.getConfirmationNo().equals(confirmationNo)) {
+                return existing;
+            }
+        }
+        return null;
     }
 
     private void upsertBillingSnapshot(Reservation reservation) {
@@ -767,7 +853,8 @@ public class FrontDeskController {
         log.setRoomType(reservation.getRoomType());
         log.setCheckInDate(reservation.getCheckInDate());
         log.setCheckOutDate(reservation.getCheckOutDate());
-        log.setNights(bill != null ? bill.getNights() : calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate()));
+        log.setNights(bill != null ? bill.getNights()
+                : calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate()));
         log.setPaymentStatus(reservation.getPaymentStatus());
         log.setGrandTotal(bill != null ? bill.getGrandTotal() : 0.0);
         checkOutLog.add(log);
@@ -795,42 +882,162 @@ public class FrontDeskController {
         return LocalDateTime.now().toString();
     }
 
+    public static class LateCheckoutPenalty {
+        private final String confirmationNo;
+        private final int daysLate;
+        private final String penaltyType; // "POINTS" or "FEE"
+        private final int pointsDeducted;
+        private final double feeAmount;
+        private final String appliedAt;
+
+        private LateCheckoutPenalty(String confirmationNo, int daysLate, String penaltyType,
+                int pointsDeducted, double feeAmount, String appliedAt) {
+            this.confirmationNo = confirmationNo;
+            this.daysLate = daysLate;
+            this.penaltyType = penaltyType;
+            this.pointsDeducted = pointsDeducted;
+            this.feeAmount = feeAmount;
+            this.appliedAt = appliedAt;
+        }
+
+        public String getConfirmationNo() {
+            return confirmationNo;
+        }
+
+        public int getDaysLate() {
+            return daysLate;
+        }
+
+        public String getPenaltyType() {
+            return penaltyType;
+        }
+
+        public int getPointsDeducted() {
+            return pointsDeducted;
+        }
+
+        public double getFeeAmount() {
+            return feeAmount;
+        }
+
+        public String getAppliedAt() {
+            return appliedAt;
+        }
+    }
+
     /**
      * Live billing view used by the front-desk UI.
      */
     public static class BillingDetails {
         private final BillingRecord record;
+        private final LateCheckoutPenalty penalty;
 
-        private BillingDetails(BillingRecord record) {
+        private BillingDetails(BillingRecord record, LateCheckoutPenalty penalty) {
             this.record = record;
+            this.penalty = penalty;
+        }
+
+        public boolean isLateCheckoutPenaltyApplied() {
+            return penalty != null;
+        }
+
+        public String getLateCheckoutPenaltyType() {
+            return penalty != null ? penalty.getPenaltyType() : null;
+        }
+
+        public int getLateCheckoutDaysLate() {
+            return penalty != null ? penalty.getDaysLate() : 0;
+        }
+
+        public int getLateCheckoutPointsDeducted() {
+            return penalty != null ? penalty.getPointsDeducted() : 0;
+        }
+
+        public double getLateCheckoutFeeAmount() {
+            return penalty != null ? penalty.getFeeAmount() : 0.0;
         }
 
         private BillingRecord toRecord() {
             return record;
         }
 
-        public String getConfirmationNo() { return record.getConfirmationNo(); }
-        public String getBillStatus() { return record.getBillStatus(); }
-        public String getPaymentStatus() { return record.getPaymentStatus(); }
-        public String getBookingStatus() { return record.getBookingStatus(); }
-        public String getGuestId() { return record.getGuestId(); }
-        public String getGuestName() { return record.getGuestName(); }
-        public String getLoyaltyTier() { return record.getLoyaltyTier(); }
-        public String getRoomNo() { return record.getRoomNo(); }
-        public String getRoomType() { return record.getRoomType(); }
-        public String getCheckInDate() { return record.getCheckInDate(); }
-        public String getCheckOutDate() { return record.getCheckOutDate(); }
-        public int getNights() { return record.getNights(); }
-        public double getNightlyRate() { return record.getNightlyRate(); }
-        public double getRoomCharges() { return record.getRoomCharges(); }
-        public double getDiscountAmount() { return record.getDiscountAmount(); }
-        public double getDiscountRate() { return record.getDiscountRate(); }
-        public double getTaxRate() { return record.getTaxRate(); }
-        public double getTaxAmount() { return record.getTaxAmount(); }
-        public double getGrandTotal() { return record.getGrandTotal(); }
+        public String getConfirmationNo() {
+            return record.getConfirmationNo();
+        }
+
+        public String getBillStatus() {
+            return record.getBillStatus();
+        }
+
+        public String getPaymentStatus() {
+            return record.getPaymentStatus();
+        }
+
+        public String getBookingStatus() {
+            return record.getBookingStatus();
+        }
+
+        public String getGuestId() {
+            return record.getGuestId();
+        }
+
+        public String getGuestName() {
+            return record.getGuestName();
+        }
+
+        public String getLoyaltyTier() {
+            return record.getLoyaltyTier();
+        }
+
+        public String getRoomNo() {
+            return record.getRoomNo();
+        }
+
+        public String getRoomType() {
+            return record.getRoomType();
+        }
+
+        public String getCheckInDate() {
+            return record.getCheckInDate();
+        }
+
+        public String getCheckOutDate() {
+            return record.getCheckOutDate();
+        }
+
+        public int getNights() {
+            return record.getNights();
+        }
+
+        public double getNightlyRate() {
+            return record.getNightlyRate();
+        }
+
+        public double getRoomCharges() {
+            return record.getRoomCharges();
+        }
+
+        public double getDiscountAmount() {
+            return record.getDiscountAmount();
+        }
+
+        public double getDiscountRate() {
+            return record.getDiscountRate();
+        }
+
+        public double getTaxRate() {
+            return record.getTaxRate();
+        }
+
+        public double getTaxAmount() {
+            return record.getTaxAmount();
+        }
+
+        public double getGrandTotal() {
+            return record.getGrandTotal();
+        }
     }
 
-    /** One combined row from stored check-in, check-out, cancellation, or billing files. */
     public static class StoredFrontDeskRecord {
         private final String confirmationNo;
         private final String guestId;
@@ -843,9 +1050,9 @@ public class FrontDeskController {
         private final String recordedAt;
 
         private StoredFrontDeskRecord(String confirmationNo, String guestId,
-                                      String guestName, String roomNo, String roomType,
-                                      String recordStatus, String paymentStatus,
-                                      double grandTotal, String recordedAt) {
+                String guestName, String roomNo, String roomType,
+                String recordStatus, String paymentStatus,
+                double grandTotal, String recordedAt) {
             this.confirmationNo = confirmationNo;
             this.guestId = guestId;
             this.guestName = guestName;
@@ -857,18 +1064,46 @@ public class FrontDeskController {
             this.recordedAt = recordedAt;
         }
 
-        public String getConfirmationNo() { return confirmationNo; }
-        public String getGuestId() { return guestId; }
-        public String getGuestName() { return guestName; }
-        public String getRoomNo() { return roomNo; }
-        public String getRoomType() { return roomType; }
-        public String getRecordStatus() { return recordStatus; }
-        public String getPaymentStatus() { return paymentStatus; }
-        public double getGrandTotal() { return grandTotal; }
-        public String getRecordedAt() { return recordedAt; }
+        public String getConfirmationNo() {
+            return confirmationNo;
+        }
+
+        public String getGuestId() {
+            return guestId;
+        }
+
+        public String getGuestName() {
+            return guestName;
+        }
+
+        public String getRoomNo() {
+            return roomNo;
+        }
+
+        public String getRoomType() {
+            return roomType;
+        }
+
+        public String getRecordStatus() {
+            return recordStatus;
+        }
+
+        public String getPaymentStatus() {
+            return paymentStatus;
+        }
+
+        public double getGrandTotal() {
+            return grandTotal;
+        }
+
+        public String getRecordedAt() {
+            return recordedAt;
+        }
     }
 
-    /** Filter + MergeSort result for the combined stored front-desk files report. */
+    /**
+     * Filter + MergeSort result for the combined stored front-desk files report.
+     */
     public static class StoredFrontDeskReport {
         private final String roomType;
         private final String recordStatus;
@@ -881,8 +1116,8 @@ public class FrontDeskController {
         private int unpaidCount;
 
         private StoredFrontDeskReport(String roomType, String recordStatus,
-                                      String paymentStatus,
-                                      DoublyLinkedList<StoredFrontDeskRecord> records) {
+                String paymentStatus,
+                DoublyLinkedList<StoredFrontDeskRecord> records) {
             this.roomType = roomType;
             this.recordStatus = recordStatus;
             this.paymentStatus = paymentStatus;
@@ -894,24 +1129,58 @@ public class FrontDeskController {
             for (int i = 1; i <= records.getNumberOfEntries(); i++) {
                 StoredFrontDeskRecord record = records.getEntry(i);
                 String status = record.getRecordStatus();
-                if ("CHECK_IN".equalsIgnoreCase(status)) checkInCount++;
-                else if ("CHECK_OUT".equalsIgnoreCase(status)) checkOutCount++;
-                else if ("CANCELLED".equalsIgnoreCase(status)) cancelledCount++;
+                if ("CHECK_IN".equalsIgnoreCase(status))
+                    checkInCount++;
+                else if ("CHECK_OUT".equalsIgnoreCase(status))
+                    checkOutCount++;
+                else if ("CANCELLED".equalsIgnoreCase(status))
+                    cancelledCount++;
 
-                if ("PAID".equalsIgnoreCase(record.getPaymentStatus())) paidCount++;
-                else unpaidCount++;
+                if ("PAID".equalsIgnoreCase(record.getPaymentStatus()))
+                    paidCount++;
+                else
+                    unpaidCount++;
             }
         }
 
-        public String getRoomType() { return roomType; }
-        public String getRecordStatus() { return recordStatus; }
-        public String getPaymentStatus() { return paymentStatus; }
-        public DoublyLinkedList<StoredFrontDeskRecord> getRecords() { return records; }
-        public int getTotalRecords() { return records.getNumberOfEntries(); }
-        public int getCheckInCount() { return checkInCount; }
-        public int getCheckOutCount() { return checkOutCount; }
-        public int getCancelledCount() { return cancelledCount; }
-        public int getPaidCount() { return paidCount; }
-        public int getUnpaidCount() { return unpaidCount; }
+        public String getRoomType() {
+            return roomType;
+        }
+
+        public String getRecordStatus() {
+            return recordStatus;
+        }
+
+        public String getPaymentStatus() {
+            return paymentStatus;
+        }
+
+        public DoublyLinkedList<StoredFrontDeskRecord> getRecords() {
+            return records;
+        }
+
+        public int getTotalRecords() {
+            return records.getNumberOfEntries();
+        }
+
+        public int getCheckInCount() {
+            return checkInCount;
+        }
+
+        public int getCheckOutCount() {
+            return checkOutCount;
+        }
+
+        public int getCancelledCount() {
+            return cancelledCount;
+        }
+
+        public int getPaidCount() {
+            return paidCount;
+        }
+
+        public int getUnpaidCount() {
+            return unpaidCount;
+        }
     }
 }
