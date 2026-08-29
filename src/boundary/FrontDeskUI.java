@@ -7,11 +7,6 @@ import entity.Reservation;
 import entity.Room;
 import java.util.Scanner;
 
-/**
- * Boundary: Front-Desk Service UI (Module 3).
- * Console search screen for guest lookup, check-in/out, and reservation listing.
- * All System.out / Scanner interactions live here — no business logic.
- */
 public class FrontDeskUI {
 
     private FrontDeskController controller;
@@ -71,7 +66,8 @@ public class FrontDeskUI {
                     exitToMainMenu = true;
                     break;
                 default:
-                    System.out.println(utility.UIUtils.RED + "Invalid option. Please try again." + utility.UIUtils.RESET);
+                    System.out
+                            .println(utility.UIUtils.RED + "Invalid option. Please try again." + utility.UIUtils.RESET);
                     utility.UIUtils.pressEnterToContinue(scanner);
             }
         } while (!exitToMainMenu);
@@ -79,22 +75,32 @@ public class FrontDeskUI {
 
     private void displayMenu() {
         utility.UIUtils.printSectionHeader("GUEST SEARCH & CHECK-IN SERVICES", utility.UIUtils.GREEN);
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Search Reservation (BST O(log n) Lookup)");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " Check-In Guest");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Check-Out Guest");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Cancel Reservation");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET
+                + " Search Reservation (BST O(log n) Lookup)");
+        System.out.println(
+                "  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " Check-In Guest");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET
+                + " Check-Out Guest");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET
+                + " Cancel Reservation");
 
         utility.UIUtils.printSectionHeader("SYSTEM RECORDS & INVENTORY", utility.UIUtils.GREEN);
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " View All Reservations (BST In-Order Sorted)");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Room Availability Status");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET
+                + " View All Reservations (BST In-Order Sorted)");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET
+                + " View Room Availability Status");
 
         utility.UIUtils.printSectionHeader("BILLING QUERY", utility.UIUtils.GREEN);
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Query Billing Details ");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Record Payment ");
-        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " View Stored Front-Desk Files (Filter + MergeSort)");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET
+                + " Query Billing Details ");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET
+                + " Record Payment ");
+        System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET
+                + " Generate Front-Desk Report (Filter + Sort)");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
-        System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
+        System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET
+                + " Back to Main Menu");
         System.out.println("──────────────────────────────────────────────────────────");
         System.out.print(utility.UIUtils.BOLD + "Enter your choice: " + utility.UIUtils.RESET);
     }
@@ -314,9 +320,12 @@ public class FrontDeskUI {
             System.out.printf("| %-6s | %-9s | $%-12.2f | %-11s |%n",
                     room.getRoomNo(), room.getRoomType(),
                     room.getNightlyRate(), room.getStatus());
-            if ("AVAILABLE".equals(room.getStatus())) available++;
-            else if ("OCCUPIED".equals(room.getStatus())) occupied++;
-            else maintenance++;
+            if ("AVAILABLE".equals(room.getStatus()))
+                available++;
+            else if ("OCCUPIED".equals(room.getStatus()))
+                occupied++;
+            else
+                maintenance++;
         }
         System.out.println("+--------+-----------+---------------+-------------+");
         System.out.printf("Summary: %d Available | %d Occupied | %d Maintenance%n",
@@ -342,21 +351,6 @@ public class FrontDeskUI {
             return;
         }
         displayBillingDetails(bill);
-        if ("UNPAID".equals(bill.getPaymentStatus()) && !"VOID".equals(bill.getBillStatus())) {
-            System.out.print("\nRecord this bill as PAID now? (Y/N): ");
-            String payNow = utility.UIUtils.safeReadLine(scanner).toUpperCase();
-            if ("Y".equals(payNow)) {
-                if (controller.recordPayment(confirmNo)) {
-                    System.out.println("Payment recorded. Status is now PAID.");
-                    FrontDeskController.BillingDetails updated = controller.queryBillingDetails(confirmNo);
-                    if (updated != null) {
-                        displayBillingDetails(updated);
-                    }
-                } else {
-                    System.out.println("Unable to record payment for this confirmation number.");
-                }
-            }
-        }
     }
 
     private void recordPayment() {
@@ -403,29 +397,32 @@ public class FrontDeskUI {
     }
 
     private void viewStoredFrontDeskRecords() {
-        utility.UIUtils.printSubHeader("MODULE 3 > STORED FRONT-DESK FILES", utility.UIUtils.GREEN);
-        String roomType = readReportChoice("Room type (ALL | STANDARD | DELUXE | SUITE): ",
-                "ALL|STANDARD|DELUXE|SUITE");
-        String recordStatus = readReportChoice(
-                "Status (ALL | CHECK_IN | CHECK_OUT | CANCELLED): ",
-                "ALL|CHECK_IN|CHECK_OUT|CANCELLED");
-        String paymentStatus = readReportChoice("Payment status (ALL | PAID | UNPAID): ",
-                "ALL|PAID|UNPAID");
+        utility.UIUtils.printSubHeader("MODULE 3 > GENERATE FRONT-DESK REPORT", utility.UIUtils.GREEN);
+        String roomType = readReportChoice("Room type", "ALL|STANDARD|DELUXE|SUITE");
+        String recordStatus = readReportChoice("Status", "ALL|CHECK_IN|CHECK_OUT|CANCELLED");
+        String paymentStatus = readReportChoice("Payment status", "ALL|PAID|UNPAID");
+        String sortField = readSortFieldChoice();
+        String sortDirection = readSortDirectionChoice(sortField);
 
-        FrontDeskController.StoredFrontDeskReport report =
-                controller.generateStoredFrontDeskReport(roomType, recordStatus, paymentStatus);
+        FrontDeskController.StoredFrontDeskReport report = controller.generateStoredFrontDeskReport(roomType,
+                recordStatus, paymentStatus, sortField, sortDirection);
         DoublyLinkedList<FrontDeskController.StoredFrontDeskRecord> records = report.getRecords();
 
-        System.out.println("\n+----------------------------------------------------------------------------------------------------------+");
-        System.out.println("                              STORED FRONT-DESK FILES REPORT");
-        System.out.println("+----------------------------------------------------------------------------------------------------------+");
+        System.out.println(
+                "\n+----------------------------------------------------------------------------------------------------------+");
+        System.out.println("                              GENERATE FRONT-DESK REPORT");
+        System.out.println(
+                "+----------------------------------------------------------------------------------------------------------+");
         System.out.println("  Filters: Room Type = " + report.getRoomType()
                 + " | Status = " + report.getRecordStatus()
-                + " | Payment = " + report.getPaymentStatus());
-        System.out.println("  Search: combined stored files  |  Sort: MergeSort by status, payment, confirmation");
-        System.out.println("+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
-        System.out.println("| No. | Confirmation | Guest          | Room   | Type      | Status     | Payment | Total      |");
-        System.out.println("+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
+                + " | Payment = " + report.getPaymentStatus()
+                + " | Sort = " + describeSort(sortField, sortDirection));
+        System.out.println(
+                "+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
+        System.out.println(
+                "| No. | Confirmation | Guest          | Room   | Type      | Status     | Payment | Total      |");
+        System.out.println(
+                "+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
         for (int i = 1; i <= records.getNumberOfEntries(); i++) {
             FrontDeskController.StoredFrontDeskRecord record = records.getEntry(i);
             System.out.printf("| %-3d | %-12s | %-14s | %-6s | %-9s | %-10s | %-7s | $%-9.2f |%n",
@@ -439,26 +436,102 @@ public class FrontDeskUI {
                     record.getGrandTotal());
         }
         if (records.isEmpty()) {
-            System.out.println("|                    No stored front-desk records match the selected filters.                   |");
+            System.out.println(
+                    "|                    No front-desk records match the selected filters.                   |");
         }
-        System.out.println("+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
+        System.out.println(
+                "+-----+--------------+----------------+--------+-----------+------------+---------+------------+");
         System.out.println("  Total Records : " + report.getTotalRecords()
                 + " | Check-In: " + report.getCheckInCount()
                 + " | Check-Out: " + report.getCheckOutCount()
                 + " | Cancelled: " + report.getCancelledCount());
         System.out.println("  Payment       : Paid=" + report.getPaidCount()
                 + " | Unpaid=" + report.getUnpaidCount());
-        System.out.println("+----------------------------------------------------------------------------------------------------------+");
+        System.out.println(
+                "+----------------------------------------------------------------------------------------------------------+");
     }
 
-    private String readReportChoice(String prompt, String permittedChoices) {
+        private String readSortFieldChoice() {
+        System.out.println("  Sort subject: 1) Confirmation No  2) Room No  3) Total Payment");
         while (true) {
-            System.out.print("  " + prompt);
-            String choice = utility.UIUtils.safeReadLine(scanner).trim().toUpperCase();
+            System.out.print("  Choice (1-3): ");
+            String choice = utility.UIUtils.safeReadLine(scanner).trim();
+            switch (choice) {
+                case "1":
+                    return FrontDeskController.sort_field_confirmation_no;
+                case "2":
+                    return FrontDeskController.sort_field_room_no;
+                case "3":
+                    return FrontDeskController.sort_field_total;
+                default:
+                    System.out.println("  [!] Invalid option. Choose 1, 2, or 3.");
+            }
+        }
+    }
+
+    private String readSortDirectionChoice(String sortField) {
+        System.out.println("  Order: 1) Default  2) Low to High  3) High to Low");
+        while (true) {
+            System.out.print("  Choice (1-3): ");
+            String choice = utility.UIUtils.safeReadLine(scanner).trim();
+            switch (choice) {
+                case "1":
+                    return FrontDeskController.sort_direction_default;
+                case "2":
+                    return FrontDeskController.sort_direction_asc;
+                case "3":
+                    return FrontDeskController.sort_direction_desc;
+                default:
+                    System.out.println("  [!] Invalid option. Choose 1, 2, or 3.");
+            }
+        }
+    }
+
+    private String describeSort(String sortField, String sortDirection) {
+        if (FrontDeskController.sort_direction_default.equals(sortDirection)) {
+            return "Default";
+        }
+        String fieldLabel;
+        if (FrontDeskController.sort_field_confirmation_no.equals(sortField)) {
+            fieldLabel = "Confirmation No";
+        } else if (FrontDeskController.sort_field_room_no.equals(sortField)) {
+            fieldLabel = "Room No";
+        } else if (FrontDeskController.sort_field_total.equals(sortField)) {
+            fieldLabel = "Total Payment";
+        } else {
+            return "Default";
+        }
+        String directionLabel = FrontDeskController.sort_direction_desc.equals(sortDirection)
+                ? "High to Low" : "Low to High";
+        return fieldLabel + " (" + directionLabel + ")";
+    }
+
+    private String readReportChoice(String label, String permittedChoices) {
+        String[] options = permittedChoices.split("\\|");
+        StringBuilder menu = new StringBuilder("  ").append(label).append(":");
+        for (int i = 0; i < options.length; i++) {
+            menu.append("  ").append(i + 1).append(") ").append(options[i]);
+        }
+        System.out.println(menu);
+        while (true) {
+            System.out.print("  Choice (1-" + options.length + "): ");
+            String input = utility.UIUtils.safeReadLine(scanner).trim();
+
+            try {
+                int index = Integer.parseInt(input);
+                if (index >= 1 && index <= options.length) {
+                    return options[index - 1];
+                }
+            } catch (NumberFormatException ignored) {
+                // Not a number; fall through to text matching below.
+            }
+
+            String choice = input.toUpperCase();
             if (("|" + permittedChoices + "|").contains("|" + choice + "|")) {
                 return choice;
             }
-            System.out.println("  [!] Invalid option. Choose from: " + permittedChoices.replace("|", " | "));
+            System.out.println("  [!] Invalid option. Choose 1-" + options.length
+                    + ", or type: " + permittedChoices.replace("|", " | "));
         }
     }
 
@@ -521,7 +594,8 @@ public class FrontDeskUI {
         System.out.println("+------------------------------------------+");
         System.out.println("  Confirmation No : " + res.getConfirmationNo());
         System.out.println("  Booking Status  : " + res.getBookingStatus());
-        System.out.println("  Payment Status  : " + (res.getPaymentStatus() == null ? "UNPAID" : res.getPaymentStatus()));
+        System.out
+                .println("  Payment Status  : " + (res.getPaymentStatus() == null ? "UNPAID" : res.getPaymentStatus()));
         System.out.println("+------------------------------------------+");
         System.out.println("  GUEST INFORMATION");
         if (guest != null) {
@@ -542,7 +616,8 @@ public class FrontDeskUI {
             System.out.println("  Nightly Rate    : $" + String.format("%.2f", room.getNightlyRate()));
             System.out.println("  Room Status     : " + room.getStatus());
         } else {
-            System.out.println("  Room Number     : " + (res.getAssignedRoomNo() != null ? res.getAssignedRoomNo() : "Not Assigned"));
+            System.out.println("  Room Number     : "
+                    + (res.getAssignedRoomNo() != null ? res.getAssignedRoomNo() : "Not Assigned"));
         }
         System.out.println("  Check-In Date   : " + res.getCheckInDate());
         System.out.println("  Check-Out Date  : " + res.getCheckOutDate());
@@ -551,13 +626,13 @@ public class FrontDeskUI {
     }
 
     private void displayEligibleReservations(String title,
-                                              DoublyLinkedList<Reservation> reservations) {
+            DoublyLinkedList<Reservation> reservations) {
         displayReservationChoices(title, reservations, false);
     }
 
     private void displayReservationChoices(String title,
-                                             DoublyLinkedList<Reservation> reservations,
-                                             boolean showStatus) {
+            DoublyLinkedList<Reservation> reservations,
+            boolean showStatus) {
         System.out.println("\n" + title);
         if (showStatus) {
             System.out.println("+-----+----------------+----------+-----------+----------------+-------------+");
@@ -571,7 +646,8 @@ public class FrontDeskUI {
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation reservation = reservations.getEntry(i);
             String roomNo = reservation.getAssignedRoomNo() == null
-                    ? "---" : reservation.getAssignedRoomNo();
+                    ? "---"
+                    : reservation.getAssignedRoomNo();
             if (showStatus) {
                 System.out.printf("| %-3d | %-14s | %-8s | %-9s | %-14s | %-11s |%n",
                         i, reservation.getConfirmationNo(), roomNo, reservation.getRoomType(),
