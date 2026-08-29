@@ -10,6 +10,7 @@ import entity.Reservation;
 import entity.Room;
 
 /**
+ * @author Soh Jun Han
  * Controller: Module 4 — Loyalty and Rewards Service.
  * Handles points accumulation, tier progressions, redemptions, and analytical reports.
  *
@@ -511,7 +512,9 @@ public class LoyaltyController {
         return history;
     }
 
-    /** Value object used by the multi-filter loyalty management report. */
+    /** Value object used by the multi-filter loyalty management report. 
+    * @author Soh Jun Han
+    */
     public static class ManagementReportEntry {
         private final String memberId;
         private final String memberName;
@@ -745,7 +748,9 @@ public class LoyaltyController {
         }
     }
 
-    /** Result returned by a room-upgrade redemption, including an actionable error message. */
+    /** Result returned by a room-upgrade redemption, including an actionable error message. 
+    * @author Soh Jun Han
+    */
     public static class RoomUpgradeResult {
         private final RedemptionTransaction transaction;
         private final Reservation reservation;
@@ -782,7 +787,9 @@ public class LoyaltyController {
         public String getErrorMessage() { return errorMessage; }
     }
 
-    /** Result returned by a late-checkout redemption. */
+    /** Result returned by a late-checkout redemption. 
+    * @author Soh Jun Han
+    */
     public static class LateCheckoutResult {
         private final RedemptionTransaction transaction;
         private final Reservation reservation;
