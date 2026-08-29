@@ -42,31 +42,35 @@ public class StandardBookingUI {
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 3:
-                    modifyPendingBooking();
+                    undoLastOperationUI();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 4:
-                    cancelPendingBooking();
+                    modifyPendingBooking();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 5:
-                    peekNextBooking();
+                    cancelPendingBooking();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 6:
-                    viewQueue();
+                    registerNewGuestUI();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 7:
-                    generateRevenueReport();
+                    peekNextBooking();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 8:
-                    generateQueuePerformanceReport();
+                    viewQueue();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 9:
-                    registerNewGuestUI();
+                    generateRevenueReport();
+                    exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
+                    break;
+                case 10:
+                    generateQueuePerformanceReport();
                     exitToMainMenu = utility.UIUtils.promptPostOperationNavigation(scanner);
                     break;
                 case 0:
@@ -83,19 +87,20 @@ public class StandardBookingUI {
         utility.UIUtils.printSectionHeader("REGISTRATION & PROCESSING", utility.UIUtils.CYAN);
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "1." + utility.UIUtils.RESET + " Create Standard Booking (Guest ID)");
         System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "2." + utility.UIUtils.RESET + " Process Next Booking (Assign Room)");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Undo Last Operation (Stack ADT)");
 
         utility.UIUtils.printSectionHeader("REGISTRATION MANAGEMENT", utility.UIUtils.CYAN);
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "3." + utility.UIUtils.RESET + " Modify Pending Booking");
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Cancel Pending Booking");
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " Register New Guest / Member");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "4." + utility.UIUtils.RESET + " Modify Pending Booking");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Cancel Pending Booking");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " Register New Guest / Member");
 
         utility.UIUtils.printSectionHeader("QUEUE MONITORING", utility.UIUtils.CYAN);
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "5." + utility.UIUtils.RESET + " Peek Next Guest in Queue");
-        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "6." + utility.UIUtils.RESET + " View Entire Standard Queue");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Peek Next Guest in Queue");
+        System.out.println("  " + utility.UIUtils.CYAN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " View Entire Pending Queue");
 
         utility.UIUtils.printSectionHeader("REPORTS & ANALYTICS", utility.UIUtils.YELLOW);
-        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET + " Reservations Revenue Analysis Report (MergeSort)");
-        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET + " Standard Queue Performance & Shortage Report");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET + " Reservations Revenue Analysis Report (MergeSort)");
+        System.out.println("  " + utility.UIUtils.YELLOW + utility.UIUtils.BOLD + "10." + utility.UIUtils.RESET + " Standard Queue Performance & Shortage Report");
 
         utility.UIUtils.printSectionHeader("NAVIGATION", utility.UIUtils.RED);
         System.out.println("  " + utility.UIUtils.RED + utility.UIUtils.BOLD + "0." + utility.UIUtils.RESET + " Back to Main Menu");
@@ -271,10 +276,31 @@ public class StandardBookingUI {
     }
 
     private void processNextBooking() {
-        utility.UIUtils.printSubHeader("MODULE 1 > PROCESS NEXT BOOKING", utility.UIUtils.CYAN);
+        utility.UIUtils.printSubHeader("MODULE 1 > PROCESS NEXT BOOKING (ROOM ASSIGNMENT)", utility.UIUtils.CYAN);
 
-        if (controller.isQueueEmpty()) {
-            System.out.println("The standard queue is EMPTY. No bookings to process.");
+        Reservation peekRes = controller.peekNextBooking();
+        if (peekRes == null) {
+            System.out.println("  [!] The pending queue is EMPTY. No bookings to process.");
+            return;
+        }
+
+        boolean isVIP = peekRes.getPriorityScore() > 0 || (peekRes.getGuest() != null && peekRes.getGuest().isVIP());
+        System.out.println("  Next Pending Reservation Details:");
+        System.out.println("  Queue Category  : " + (isVIP ? utility.UIUtils.YELLOW + "VIP Priority Queue (Max-Heap)" + utility.UIUtils.RESET : "Standard Queue (FIFO)"));
+        System.out.println("  Confirmation No : " + peekRes.getConfirmationNo());
+        System.out.println("  Guest ID        : " + peekRes.getGuestId());
+        System.out.println("  Guest Name      : " + (peekRes.getGuest() != null ? peekRes.getGuest().getName() : "N/A"));
+        if (isVIP && peekRes.getGuest() != null) {
+            System.out.println("  Loyalty Tier    : " + peekRes.getGuest().getLoyaltyTier() + " (Priority Score: " + peekRes.getPriorityScore() + ")");
+        }
+        System.out.println("  Requested Room  : " + peekRes.getRoomType());
+        System.out.println("  Stay Dates      : " + peekRes.getCheckInDate() + " to " + peekRes.getCheckOutDate());
+        System.out.println();
+
+        System.out.print(utility.UIUtils.YELLOW + "  Assign room for this guest now? (Y/N): " + utility.UIUtils.RESET);
+        String confirm = utility.UIUtils.safeReadLine(scanner).trim();
+        if (!"Y".equalsIgnoreCase(confirm)) {
+            System.out.println("  [!] Room assignment operation cancelled. Guest remains in queue.");
             return;
         }
 
@@ -282,23 +308,52 @@ public class StandardBookingUI {
         if (res != null) {
             System.out.println("\n+------------------------------------------+");
             if ("CONFIRMED".equals(res.getBookingStatus())) {
-                System.out.println("  ROOM ASSIGNED SUCCESSFULLY!");
+                System.out.println(utility.UIUtils.GREEN + "  ROOM ASSIGNED SUCCESSFULLY!" + utility.UIUtils.RESET);
                 System.out.println("+------------------------------------------+");
                 System.out.println("  Confirmation No : " + res.getConfirmationNo());
                 System.out.println("  Guest ID        : " + res.getGuestId());
                 System.out.println("  Guest Name      : " + (res.getGuest() != null ? res.getGuest().getName() : "N/A"));
-                System.out.println("  Room Assigned   : " + res.getAssignedRoomNo());
+                System.out.println("  Room Assigned   : " + utility.UIUtils.GREEN + res.getAssignedRoomNo() + utility.UIUtils.RESET);
                 System.out.println("  Room Type       : " + res.getRoomType());
                 System.out.println("  Status          : " + res.getBookingStatus());
             } else {
-                System.out.println("  NO ROOMS AVAILABLE");
+                System.out.println(utility.UIUtils.RED + "  NO ROOMS AVAILABLE FOR REQUESTED DATES" + utility.UIUtils.RESET);
                 System.out.println("+------------------------------------------+");
                 System.out.println("  Confirmation No : " + res.getConfirmationNo());
-                System.out.println("  Guest dequeued but no room could be assigned.");
+                System.out.println("  Guest remains PENDING in queue.");
                 System.out.println("  Status          : " + res.getBookingStatus());
             }
-            System.out.println("  Remaining in Queue: " + controller.getQueueSize());
             System.out.println("+------------------------------------------+");
+        }
+    }
+
+    private void undoLastOperationUI() {
+        utility.UIUtils.printSubHeader("MODULE 1 > UNDO LAST OPERATION (LIFO STACK ADT)", utility.UIUtils.YELLOW);
+
+        if (controller.getUndoController() == null || controller.getUndoController().isQueueEmpty()) {
+            System.out.println("  [!] No operations available on the Undo Stack.");
+            return;
+        }
+
+        entity.UndoAction action = controller.getUndoController().peekNextUndo();
+        System.out.println("  Operation on Top of Stack (LIFO):");
+        System.out.println("  Action Type     : " + action.getActionType());
+        System.out.println("  Module Source   : " + action.getModuleName());
+        System.out.println("  Description     : " + utility.UIUtils.CYAN + action.getDescription() + utility.UIUtils.RESET);
+        System.out.println();
+
+        System.out.print(utility.UIUtils.YELLOW + "  Are you sure you want to UNDO and reverse this operation? (Y/N): " + utility.UIUtils.RESET);
+        String confirm = utility.UIUtils.safeReadLine(scanner).trim();
+        if (!"Y".equalsIgnoreCase(confirm)) {
+            System.out.println("  [!] Undo operation cancelled. Stack unchanged.");
+            return;
+        }
+
+        entity.UndoAction executed = controller.getUndoController().processNextUndo();
+        if (executed != null) {
+            System.out.println(utility.UIUtils.GREEN + "  [+] Operation undone successfully! System state restored." + utility.UIUtils.RESET);
+        } else {
+            System.out.println(utility.UIUtils.RED + "  [!] Failed to execute undo operation." + utility.UIUtils.RESET);
         }
     }
 
@@ -307,52 +362,79 @@ public class StandardBookingUI {
 
         Reservation res = controller.peekNextBooking();
         if (res == null) {
-            System.out.println("The standard queue is EMPTY.");
+            System.out.println("  [!] The pending queue is EMPTY.");
         } else {
+            boolean isVIP = res.getPriorityScore() > 0 || (res.getGuest() != null && res.getGuest().isVIP());
+            System.out.println("  Queue Category  : " + (isVIP ? utility.UIUtils.YELLOW + "VIP Priority Queue (Max-Heap)" + utility.UIUtils.RESET : "Standard Queue (FIFO)"));
             System.out.println("  Next Guest      : " + (res.getGuest() != null ? res.getGuest().getName() : res.getGuestId()));
+            if (isVIP && res.getGuest() != null) {
+                System.out.println("  Loyalty Tier    : " + res.getGuest().getLoyaltyTier() + " (Priority Score: " + res.getPriorityScore() + ")");
+            }
             System.out.println("  Confirmation No : " + res.getConfirmationNo());
             System.out.println("  Room Type       : " + res.getRoomType());
+            System.out.println("  Stay Dates      : " + res.getCheckInDate() + " to " + res.getCheckOutDate());
             System.out.println("  Status          : " + res.getBookingStatus());
         }
     }
 
     private void viewQueue() {
-        utility.UIUtils.printSubHeader("MODULE 1 > VIEW STANDARD BOOKING QUEUE", utility.UIUtils.CYAN);
-        System.out.println("Queue Size: " + controller.getQueueSize());
+        utility.UIUtils.printSubHeader("MODULE 1 > VIEW ALL PENDING BOOKING QUEUES", utility.UIUtils.CYAN);
+        DoublyLinkedList<Reservation> list = controller.getAllPendingReservations();
+        System.out.println("Total Pending Queue Size: " + (list != null ? list.getNumberOfEntries() : 0));
 
-        if (controller.isQueueEmpty()) {
-            System.out.println("The queue is empty.");
+        if (list == null || list.isEmpty()) {
+            System.out.println("The pending queue is empty.");
             return;
         }
 
-        DoublyLinkedList<Reservation> list = controller.getQueueList();
-        System.out.println("+-----+----------------+----------------+-----------+------------+");
-        System.out.println("| No. | Confirmation   | Guest ID       | Room Type | Status     |");
-        System.out.println("+-----+----------------+----------------+-----------+------------+");
+        System.out.println("+-----+----------------+----------------+----------------------+-----------+------------+------------+");
+        System.out.println("| No. | Confirmation   | Guest ID       | Guest Name           | Room Type | Priority   | Status     |");
+        System.out.println("+-----+----------------+----------------+----------------------+-----------+------------+------------+");
 
         for (int i = 1; i <= list.getNumberOfEntries(); i++) {
             Reservation res = list.getEntry(i);
-            System.out.printf("| %-3d | %-14s | %-14s | %-9s | %-10s |%n",
-                    i, res.getConfirmationNo(), res.getGuestId(),
-                    res.getRoomType(), res.getBookingStatus());
+            String guestName = res.getGuest() != null ? res.getGuest().getName() : res.getGuestId();
+            String priorityStr = res.getPriorityScore() > 0 ? String.valueOf(res.getPriorityScore()) : "0 (FIFO)";
+            System.out.printf("| %-3d | %-14s | %-14s | %-20s | %-9s | %-10s | %-10s |%n",
+                    i, res.getConfirmationNo(), res.getGuestId(), guestName,
+                    res.getRoomType(), priorityStr, res.getBookingStatus());
         }
-        System.out.println("+-----+----------------+----------------+-----------+------------+");
+        System.out.println("+-----+----------------+----------------+----------------------+-----------+------------+------------+");
     }
 
     private void modifyPendingBooking() {
         utility.UIUtils.printSubHeader("MODULE 1 > MODIFY PENDING BOOKING", utility.UIUtils.CYAN);
-        System.out.print("Enter Confirmation Number: ");
-        String confNo = utility.UIUtils.safeReadLine(scanner).trim();
+        System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type '0' or 'b' or 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
+        displayPendingReservationsList();
         
-        Reservation res = controller.findReservationByConfNo(confNo);
-        if (res == null) {
-            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Reservation with Confirmation No " + confNo + " not found." + utility.UIUtils.RESET);
-            return;
-        }
+        Reservation res = null;
+        String confNo = "";
         
-        if (!"PENDING".equals(res.getBookingStatus())) {
-            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Only PENDING reservations can be modified (Status is currently: " + res.getBookingStatus() + ")." + utility.UIUtils.RESET);
-            return;
+        while (true) {
+            System.out.print("Enter Confirmation Number: ");
+            confNo = utility.UIUtils.safeReadLine(scanner).trim();
+            
+            if ("0".equals(confNo) || "b".equalsIgnoreCase(confNo) || "back".equalsIgnoreCase(confNo) || "cancel".equalsIgnoreCase(confNo)) {
+                System.out.println("  Operation cancelled.");
+                return;
+            }
+            
+            if (confNo.isEmpty()) {
+                continue;
+            }
+            
+            res = controller.findReservationByConfNo(confNo);
+            if (res == null) {
+                System.out.println(utility.UIUtils.RED + "  [!] ERROR: Reservation with Confirmation No " + confNo + " not found. Please try again." + utility.UIUtils.RESET);
+                continue;
+            }
+            
+            if (!"PENDING".equals(res.getBookingStatus())) {
+                System.out.println(utility.UIUtils.RED + "  [!] ERROR: Only PENDING reservations can be modified (Status is currently: " + res.getBookingStatus() + "). Please try again." + utility.UIUtils.RESET);
+                continue;
+            }
+            
+            break;
         }
         
         System.out.println("\n  Current Details:");
@@ -369,6 +451,10 @@ public class StandardBookingUI {
         System.out.println("  Room Options: STANDARD | DELUXE | SUITE");
         System.out.print("  New Room Type [" + res.getRoomType() + "]: ");
         String roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+        if ("0".equals(roomType) || "CANCEL".equals(roomType) || "B".equals(roomType) || "BACK".equals(roomType)) {
+            System.out.println("  Modification cancelled.");
+            return;
+        }
         if (roomType.isEmpty()) {
             roomType = res.getRoomType();
         } else {
@@ -376,6 +462,10 @@ public class StandardBookingUI {
                 System.out.println("  [!] ERROR: Invalid room type. Choose STANDARD | DELUXE | SUITE.");
                 System.out.print("  New Room Type [" + res.getRoomType() + "]: ");
                 roomType = utility.UIUtils.safeReadLine(scanner).toUpperCase().trim();
+                if ("0".equals(roomType) || "CANCEL".equals(roomType) || "B".equals(roomType) || "BACK".equals(roomType)) {
+                    System.out.println("  Modification cancelled.");
+                    return;
+                }
                 if (roomType.isEmpty()) {
                     roomType = res.getRoomType();
                     break;
@@ -386,6 +476,10 @@ public class StandardBookingUI {
         // 2. Check-In Date
         System.out.print("  New Check-In (YYYY-MM-DD) [" + res.getCheckInDate() + "]: ");
         String checkIn = utility.UIUtils.safeReadLine(scanner).trim();
+        if ("0".equals(checkIn) || "cancel".equalsIgnoreCase(checkIn) || "b".equalsIgnoreCase(checkIn) || "back".equalsIgnoreCase(checkIn)) {
+            System.out.println("  Modification cancelled.");
+            return;
+        }
         if (checkIn.isEmpty()) {
             checkIn = res.getCheckInDate();
         } else {
@@ -393,6 +487,10 @@ public class StandardBookingUI {
                 System.out.println("  [!] ERROR: Invalid date format. Enter in YYYY-MM-DD format.");
                 System.out.print("  New Check-In (YYYY-MM-DD) [" + res.getCheckInDate() + "]: ");
                 checkIn = utility.UIUtils.safeReadLine(scanner).trim();
+                if ("0".equals(checkIn) || "cancel".equalsIgnoreCase(checkIn) || "b".equalsIgnoreCase(checkIn) || "back".equalsIgnoreCase(checkIn)) {
+                    System.out.println("  Modification cancelled.");
+                    return;
+                }
                 if (checkIn.isEmpty()) {
                     checkIn = res.getCheckInDate();
                     break;
@@ -403,6 +501,10 @@ public class StandardBookingUI {
         // 3. Check-Out Date
         System.out.print("  New Check-Out Date (YYYY-MM-DD) [" + res.getCheckOutDate() + "]: ");
         String checkOut = utility.UIUtils.safeReadLine(scanner).trim();
+        if ("0".equals(checkOut) || "cancel".equalsIgnoreCase(checkOut) || "b".equalsIgnoreCase(checkOut) || "back".equalsIgnoreCase(checkOut)) {
+            System.out.println("  Modification cancelled.");
+            return;
+        }
         if (checkOut.isEmpty()) {
             checkOut = res.getCheckOutDate();
         } else {
@@ -416,6 +518,10 @@ public class StandardBookingUI {
                 }
                 System.out.print("  New Check-Out Date (YYYY-MM-DD) [" + res.getCheckOutDate() + "]: ");
                 checkOut = utility.UIUtils.safeReadLine(scanner).trim();
+                if ("0".equals(checkOut) || "cancel".equalsIgnoreCase(checkOut) || "b".equalsIgnoreCase(checkOut) || "back".equalsIgnoreCase(checkOut)) {
+                    System.out.println("  Modification cancelled.");
+                    return;
+                }
                 if (checkOut.isEmpty()) {
                     checkOut = res.getCheckOutDate();
                     break;
@@ -445,18 +551,37 @@ public class StandardBookingUI {
 
     private void cancelPendingBooking() {
         utility.UIUtils.printSubHeader("MODULE 1 > CANCEL PENDING BOOKING", utility.UIUtils.CYAN);
-        System.out.print("Enter Confirmation Number: ");
-        String confNo = utility.UIUtils.safeReadLine(scanner).trim();
+        System.out.println(utility.UIUtils.YELLOW + "  [ TIP: Type '0' or 'b' or 'cancel' to exit ]" + utility.UIUtils.RESET + "\n");
+        displayPendingReservationsList();
         
-        Reservation res = controller.findReservationByConfNo(confNo);
-        if (res == null) {
-            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Reservation with Confirmation No " + confNo + " not found." + utility.UIUtils.RESET);
-            return;
-        }
+        Reservation res = null;
+        String confNo = "";
         
-        if (!"PENDING".equals(res.getBookingStatus())) {
-            System.out.println(utility.UIUtils.RED + "  [!] ERROR: Only PENDING reservations can be cancelled here (Status is currently: " + res.getBookingStatus() + ")." + utility.UIUtils.RESET);
-            return;
+        while (true) {
+            System.out.print("Enter Confirmation Number: ");
+            confNo = utility.UIUtils.safeReadLine(scanner).trim();
+            
+            if ("0".equals(confNo) || "b".equalsIgnoreCase(confNo) || "back".equalsIgnoreCase(confNo) || "cancel".equalsIgnoreCase(confNo)) {
+                System.out.println("  Operation cancelled.");
+                return;
+            }
+            
+            if (confNo.isEmpty()) {
+                continue;
+            }
+            
+            res = controller.findReservationByConfNo(confNo);
+            if (res == null) {
+                System.out.println(utility.UIUtils.RED + "  [!] ERROR: Reservation with Confirmation No " + confNo + " not found. Please try again." + utility.UIUtils.RESET);
+                continue;
+            }
+            
+            if (!"PENDING".equals(res.getBookingStatus())) {
+                System.out.println(utility.UIUtils.RED + "  [!] ERROR: Only PENDING reservations can be cancelled here (Status is currently: " + res.getBookingStatus() + "). Please try again." + utility.UIUtils.RESET);
+                continue;
+            }
+            
+            break;
         }
         
         System.out.println("\n  Reservation Details:");
@@ -482,43 +607,7 @@ public class StandardBookingUI {
     private void generateRevenueReport() {
         utility.UIUtils.printSubHeader("REVENUE ANALYSIS REPORT", utility.UIUtils.YELLOW);
         
-        System.out.println("  Select Room Type(s) to filter by:");
-        System.out.println("    1. STANDARD");
-        System.out.println("    2. DELUXE");
-        System.out.println("    3. SUITE");
-        System.out.println("    4. ALL");
-        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 4 for ALL): ");
-        String roomInput = utility.UIUtils.safeReadLine(scanner).trim();
-        
-        DoublyLinkedList<String> roomFilters = new DoublyLinkedList<>();
-        if (roomInput.isEmpty()) {
-            roomFilters.add("ALL");
-        } else {
-            String[] parts = roomInput.split(",");
-            for (String part : parts) {
-                String choice = part.trim();
-                switch (choice) {
-                    case "1":
-                        roomFilters.add("STANDARD");
-                        break;
-                    case "2":
-                        roomFilters.add("DELUXE");
-                        break;
-                    case "3":
-                        roomFilters.add("SUITE");
-                        break;
-                    case "4":
-                    default:
-                        if (choice.equals("4")) {
-                            roomFilters.add("ALL");
-                        }
-                        break;
-                }
-            }
-        }
-        if (roomFilters.isEmpty()) {
-            roomFilters.add("ALL");
-        }
+        DoublyLinkedList<String> roomFilters = promptRoomFilters();
         
         System.out.println("  Select Booking Status(es) to filter by:");
         System.out.println("    1. PENDING");
@@ -598,11 +687,8 @@ public class StandardBookingUI {
             for (int i = 1; i <= list.getNumberOfEntries(); i++) {
                 Reservation res = list.getEntry(i);
                 try {
-                    long days = java.time.LocalDate.parse(res.getCheckOutDate()).toEpochDay() - java.time.LocalDate.parse(res.getCheckInDate()).toEpochDay();
-                    double rate = 100.0;
-                    if ("DELUXE".equals(res.getRoomType())) rate = 200.0;
-                    else if ("SUITE".equals(res.getRoomType())) rate = 500.0;
-                    double revenue = days * rate;
+                    long days = StandardBookingController.calculateStayDuration(res.getCheckInDate(), res.getCheckOutDate());
+                    double revenue = StandardBookingController.calculateRevenue(res);
                     String guestName = res.getGuest() != null ? res.getGuest().getName() : res.getGuestId();
                     if (guestName.length() > 20) guestName = guestName.substring(0, 17) + "...";
                     
@@ -628,43 +714,7 @@ public class StandardBookingUI {
     private void generateQueuePerformanceReport() {
         utility.UIUtils.printSubHeader("QUEUE PERFORMANCE REPORT", utility.UIUtils.YELLOW);
         
-        System.out.println("  Select Room Type(s) to filter by:");
-        System.out.println("    1. STANDARD");
-        System.out.println("    2. DELUXE");
-        System.out.println("    3. SUITE");
-        System.out.println("    4. ALL");
-        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 4 for ALL): ");
-        String roomInput = utility.UIUtils.safeReadLine(scanner).trim();
-        
-        DoublyLinkedList<String> roomFilters = new DoublyLinkedList<>();
-        if (roomInput.isEmpty()) {
-            roomFilters.add("ALL");
-        } else {
-            String[] parts = roomInput.split(",");
-            for (String part : parts) {
-                String choice = part.trim();
-                switch (choice) {
-                    case "1":
-                        roomFilters.add("STANDARD");
-                        break;
-                    case "2":
-                        roomFilters.add("DELUXE");
-                        break;
-                    case "3":
-                        roomFilters.add("SUITE");
-                        break;
-                    case "4":
-                    default:
-                        if (choice.equals("4")) {
-                            roomFilters.add("ALL");
-                        }
-                        break;
-                }
-            }
-        }
-        if (roomFilters.isEmpty()) {
-            roomFilters.add("ALL");
-        }
+        DoublyLinkedList<String> roomFilters = promptRoomFilters();
         
         StandardBookingController.QueuePerformanceReport report = controller.generateQueuePerformanceReport(roomFilters);
         
@@ -782,5 +832,66 @@ public class StandardBookingUI {
             scanner.next();
         }
         return scanner.nextInt();
+    }
+
+    private void displayPendingReservationsList() {
+        DoublyLinkedList<Reservation> pendingList = controller.getAllPendingReservations();
+        if (pendingList == null || pendingList.isEmpty()) {
+            System.out.println("  [No pending reservations available]\n");
+            return;
+        }
+        System.out.println("  Pending Reservations:");
+        for (int i = 1; i <= pendingList.getNumberOfEntries(); i++) {
+            Reservation pendingRes = pendingList.getEntry(i);
+            if (pendingRes != null) {
+                String guestName = pendingRes.getGuest() != null ? pendingRes.getGuest().getName() : pendingRes.getGuestId();
+                System.out.println("  " + pendingRes.getConfirmationNo() + ", " 
+                        + pendingRes.getRoomType() + ", "
+                        + pendingRes.getCheckInDate() + " to " + pendingRes.getCheckOutDate() + ", " 
+                        + guestName);
+            }
+        }
+        System.out.println();
+    }
+
+    private DoublyLinkedList<String> promptRoomFilters() {
+        System.out.println("  Select Room Type(s) to filter by:");
+        System.out.println("    1. STANDARD");
+        System.out.println("    2. DELUXE");
+        System.out.println("    3. SUITE");
+        System.out.println("    4. ALL");
+        System.out.print("  Enter choice(s) using numbers separated by commas (e.g., 1,2 or 4 for ALL): ");
+        String roomInput = utility.UIUtils.safeReadLine(scanner).trim();
+        
+        DoublyLinkedList<String> roomFilters = new DoublyLinkedList<>();
+        if (roomInput.isEmpty()) {
+            roomFilters.add("ALL");
+        } else {
+            String[] parts = roomInput.split(",");
+            for (String part : parts) {
+                String choice = part.trim();
+                switch (choice) {
+                    case "1":
+                        roomFilters.add("STANDARD");
+                        break;
+                    case "2":
+                        roomFilters.add("DELUXE");
+                        break;
+                    case "3":
+                        roomFilters.add("SUITE");
+                        break;
+                    case "4":
+                    default:
+                        if (choice.equals("4")) {
+                            roomFilters.add("ALL");
+                        }
+                        break;
+                }
+            }
+        }
+        if (roomFilters.isEmpty()) {
+            roomFilters.add("ALL");
+        }
+        return roomFilters;
     }
 }

@@ -146,6 +146,7 @@ public class Main {
 
         mod1.setUndoController(undoController);
         mod1.setLoyaltyController(mod4);
+        mod1.setVipQueue(vipQueue);
         mod2.setUndoController(undoController);
         mod3.setUndoController(undoController);
         mod4.setUndoController(undoController);

@@ -1,9 +1,11 @@
 package control;
 
+import adt.BinaryMaxHeap;
 import adt.BinarySearchTree;
 import adt.DoublyLinkedList;
 import adt.LinkedQueue;
 import adt.SortAlgorithms;
+import control.VIPAllocationController.VIPReservation;
 import entity.Guest;
 import entity.LoyaltyAccount;
 import entity.Reservation;
@@ -24,6 +26,7 @@ import java.time.LocalDate;
 public class StandardBookingController {
 
     private LinkedQueue<Reservation> standardQueue;
+    private BinaryMaxHeap<VIPReservation> vipQueue;
     private DoublyLinkedList<Guest> guestRegistry;
     private DoublyLinkedList<Room> roomInventory;
     private BinarySearchTree<Reservation> searchTree;
@@ -41,6 +44,10 @@ public class StandardBookingController {
         this.guestRegistry = guestRegistry;
         this.roomInventory = roomInventory;
         this.searchTree = searchTree;
+    }
+
+    public void setVipQueue(BinaryMaxHeap<VIPReservation> vipQueue) {
+        this.vipQueue = vipQueue;
     }
 
     public void setUndoController(UndoController undoController) {
@@ -71,7 +78,56 @@ public class StandardBookingController {
      *
      * @return The processed Reservation with assigned room, or null if queue is empty.
      */
+    public UndoController getUndoController() {
+        return undoController;
+    }
+
+    /**
+     * Processes the next booking in line (prioritizing VIP Max-Heap root first, then Standard FIFO queue).
+     * Assigns room if available and records reversible UndoAction onto the LinkedStack.
+     */
     public Reservation processNextBooking() {
+        // 1. Check VIP Priority Queue first
+        if (vipQueue != null && !vipQueue.isEmpty()) {
+            VIPReservation rootVIP = vipQueue.peek();
+            if (rootVIP != null && rootVIP.getReservation() != null
+                    && "PENDING".equals(rootVIP.getReservation().getBookingStatus())) {
+                Reservation res = rootVIP.getReservation();
+                Room assignedRoom = findAvailableRoomForDates(res.getRoomType(), res.getCheckInDate(), res.getCheckOutDate());
+                if (assignedRoom != null) {
+                    VIPReservation dequeuedVIP = vipQueue.dequeue();
+                    res.setAssignedRoomNo(assignedRoom.getRoomNo());
+                    res.setBookingStatus("CONFIRMED");
+                    try {
+                        if (LocalDate.parse(res.getCheckInDate()).equals(LocalDate.now())) {
+                            assignedRoom.setStatus("OCCUPIED");
+                        }
+                    } catch (Exception e) {}
+
+                    searchTree.delete(res);
+                    searchTree.insert(res);
+
+                    if (undoController != null) {
+                        undoController.recordAction(
+                            "PROCESS_VIP_BOOKING",
+                            "Module 2: VIP Allocation",
+                            "Assigned Room " + assignedRoom.getRoomNo() + " to VIP: " + (res.getGuest() != null ? res.getGuest().getName() : res.getGuestId()) + " (Conf #" + res.getConfirmationNo() + ")",
+                            () -> {
+                                assignedRoom.setStatus("AVAILABLE");
+                                res.setAssignedRoomNo(null);
+                                res.setBookingStatus("PENDING");
+                                vipQueue.enqueue(dequeuedVIP);
+                                searchTree.delete(res);
+                                searchTree.insert(res);
+                            }
+                        );
+                    }
+                    return res;
+                }
+            }
+        }
+
+        // 2. Fallback to Standard FIFO Queue
         if (standardQueue.isEmpty()) {
             return null;
         }
@@ -79,7 +135,6 @@ public class StandardBookingController {
         Reservation reservation = dequeueNextActiveReservation();
         if (reservation == null) return null;
 
-        // Find an available room matching the requested type
         Room assignedRoom = findAvailableRoomForDates(reservation.getRoomType(), reservation.getCheckInDate(), reservation.getCheckOutDate());
         if (assignedRoom != null) {
             reservation.setAssignedRoomNo(assignedRoom.getRoomNo());
@@ -90,16 +145,14 @@ public class StandardBookingController {
                 }
             } catch (Exception e) {}
 
-            // Update the BST entry
             searchTree.delete(reservation);
             searchTree.insert(reservation);
 
-            // Record Undo Action
             if (undoController != null) {
                 undoController.recordAction(
                     "PROCESS_BOOKING",
                     "Module 1: Standard Booking",
-                    "Assigned Room " + assignedRoom.getRoomNo() + " to Conf #" + reservation.getConfirmationNo(),
+                    "Assigned Room " + assignedRoom.getRoomNo() + " to Guest: " + (reservation.getGuest() != null ? reservation.getGuest().getName() : reservation.getGuestId()) + " (Conf #" + reservation.getConfirmationNo() + ")",
                     () -> {
                         assignedRoom.setStatus("AVAILABLE");
                         reservation.setAssignedRoomNo(null);
@@ -111,7 +164,6 @@ public class StandardBookingController {
                 );
             }
         } else {
-            // No room available — booking stays PENDING but is dequeued
             reservation.setBookingStatus("PENDING");
             standardQueue.enqueue(reservation);
         }
@@ -204,8 +256,26 @@ public class StandardBookingController {
 
     /**
      * Peeks at the next booking in the queue without removing it.
+     * Prioritizes highest-priority VIP guest from VIP queue first, then falls back to standard queue.
      */
     public Reservation peekNextBooking() {
+        if (vipQueue != null && !vipQueue.isEmpty()) {
+            DoublyLinkedList<VIPReservation> list = vipQueue.toList();
+            VIPReservation highest = null;
+            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
+                VIPReservation candidate = list.getEntry(i);
+                if (candidate != null && candidate.getReservation() != null
+                        && "PENDING".equals(candidate.getReservation().getBookingStatus())) {
+                    if (highest == null || candidate.compareTo(highest) > 0) {
+                        highest = candidate;
+                    }
+                }
+            }
+            if (highest != null) {
+                return highest.getReservation();
+            }
+        }
+
         DoublyLinkedList<Reservation> reservations = standardQueue.toList();
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation reservation = reservations.getEntry(i);
@@ -236,6 +306,23 @@ public class StandardBookingController {
             }
         }
         return pendingReservations;
+    }
+
+    /**
+     * Returns all pending reservations in the system (both standard and VIP),
+     * sorted by Priority Score descending (highest priority VIPs first).
+     */
+    public DoublyLinkedList<Reservation> getAllPendingReservations() {
+        DoublyLinkedList<Reservation> pendingReservations = new DoublyLinkedList<>();
+        DoublyLinkedList<Reservation> allReservations = searchTree.inOrderTraversal();
+        for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
+            Reservation reservation = allReservations.getEntry(i);
+            if (reservation != null && "PENDING".equals(reservation.getBookingStatus())) {
+                pendingReservations.add(reservation);
+            }
+        }
+        return SortAlgorithms.mergeSort(pendingReservations, (r1, r2) ->
+                Integer.compare(r2.getPriorityScore(), r1.getPriorityScore()));
     }
 
     /**
@@ -340,7 +427,7 @@ public class StandardBookingController {
                 Reservation res = allReservations.getEntry(i);
                 if (res != null && res.getRoomType().equalsIgnoreCase(roomType)) {
                     String status = res.getBookingStatus();
-                    if ("PENDING".equals(status) || "CONFIRMED".equals(status) || "CHECKED_IN".equals(status)) {
+                    if (isReservationActive(status)) {
                         LocalDate resCheckIn = LocalDate.parse(res.getCheckInDate());
                         LocalDate resCheckOut = LocalDate.parse(res.getCheckOutDate());
                         
@@ -393,7 +480,7 @@ public class StandardBookingController {
                 Reservation res = allReservations.getEntry(i);
                 if (res != null && guestId.equals(res.getGuestId())) {
                     String status = res.getBookingStatus();
-                    if ("PENDING".equals(status) || "CONFIRMED".equals(status) || "CHECKED_IN".equals(status)) {
+                    if (isReservationActive(status)) {
                         LocalDate resCheckIn = LocalDate.parse(res.getCheckInDate());
                         LocalDate resCheckOut = LocalDate.parse(res.getCheckOutDate());
                         
@@ -479,14 +566,6 @@ public class StandardBookingController {
         DoublyLinkedList<Reservation> matches = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> allReservations = searchTree.inOrderTraversal();
 
-        boolean allowAllRooms = roomTypes.isEmpty();
-        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
-            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
-                allowAllRooms = true;
-                break;
-            }
-        }
-
         boolean allowAllStatuses = bookingStatuses.isEmpty();
         for (int i = 1; i <= bookingStatuses.getNumberOfEntries(); i++) {
             if ("ALL".equalsIgnoreCase(bookingStatuses.getEntry(i))) {
@@ -501,17 +580,8 @@ public class StandardBookingController {
                 continue;
             }
             
-            if (!allowAllRooms) {
-                boolean roomMatched = false;
-                for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
-                    if (roomTypes.getEntry(j).equalsIgnoreCase(res.getRoomType())) {
-                        roomMatched = true;
-                        break;
-                    }
-                }
-                if (!roomMatched) {
-                    continue;
-                }
+            if (!isRoomTypeMatched(roomTypes, res.getRoomType())) {
+                continue;
             }
             
             if (!allowAllStatuses) {
@@ -527,29 +597,28 @@ public class StandardBookingController {
                 }
             }
 
-            try {
-                long duration = LocalDate.parse(res.getCheckOutDate()).toEpochDay() - LocalDate.parse(res.getCheckInDate()).toEpochDay();
-                if (duration < minDuration) {
-                    continue;
-                }
-                matches.add(res);
-            } catch (Exception e) {
-                // Ignore
+            long duration = calculateStayDuration(res.getCheckInDate(), res.getCheckOutDate());
+            if (duration < minDuration) {
+                continue;
             }
+            matches.add(res);
         }
 
         // Sort by duration descending using MergeSort
         DoublyLinkedList<Reservation> sorted = SortAlgorithms.mergeSort(matches, (r1, r2) -> {
-            try {
-                long d1 = LocalDate.parse(r1.getCheckOutDate()).toEpochDay() - LocalDate.parse(r1.getCheckInDate()).toEpochDay();
-                long d2 = LocalDate.parse(r2.getCheckOutDate()).toEpochDay() - LocalDate.parse(r2.getCheckInDate()).toEpochDay();
-                return Long.compare(d2, d1); // Descending
-            } catch (Exception e) {
-                return 0;
-            }
+            long d1 = calculateStayDuration(r1.getCheckInDate(), r1.getCheckOutDate());
+            long d2 = calculateStayDuration(r2.getCheckInDate(), r2.getCheckOutDate());
+            return Long.compare(d2, d1); // Descending
         });
 
         StringBuilder roomSb = new StringBuilder();
+        boolean allowAllRooms = roomTypes.isEmpty();
+        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
+                allowAllRooms = true;
+                break;
+            }
+        }
         if (allowAllRooms) {
             roomSb.append("ALL");
         } else {
@@ -579,14 +648,6 @@ public class StandardBookingController {
         DoublyLinkedList<Reservation> pending = new DoublyLinkedList<>();
         DoublyLinkedList<Reservation> allQueue = standardQueue.toList();
 
-        boolean allowAllRooms = roomTypes.isEmpty();
-        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
-            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
-                allowAllRooms = true;
-                break;
-            }
-        }
-
         LocalDate today = LocalDate.now();
         for (int i = 1; i <= allQueue.getNumberOfEntries(); i++) {
             Reservation res = allQueue.getEntry(i);
@@ -598,17 +659,7 @@ public class StandardBookingController {
                     }
                 } catch (Exception e) {}
                 
-                boolean roomMatched = allowAllRooms;
-                if (!allowAllRooms) {
-                    for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
-                        if (roomTypes.getEntry(j).equalsIgnoreCase(res.getRoomType())) {
-                            roomMatched = true;
-                            break;
-                        }
-                    }
-                }
-                
-                if (roomMatched) {
+                if (isRoomTypeMatched(roomTypes, res.getRoomType())) {
                     pending.add(res);
                 }
             }
@@ -624,22 +675,20 @@ public class StandardBookingController {
         for (int i = 1; i <= roomInventory.getNumberOfEntries(); i++) {
             Room r = roomInventory.getEntry(i);
             if (r != null && "AVAILABLE".equals(r.getStatus())) {
-                boolean roomMatched = allowAllRooms;
-                if (!allowAllRooms) {
-                    for (int j = 1; j <= roomTypes.getNumberOfEntries(); j++) {
-                        if (roomTypes.getEntry(j).equalsIgnoreCase(r.getRoomType())) {
-                            roomMatched = true;
-                            break;
-                        }
-                    }
-                }
-                if (roomMatched) {
+                if (isRoomTypeMatched(roomTypes, r.getRoomType())) {
                     availCount++;
                 }
             }
         }
 
         StringBuilder roomSb = new StringBuilder();
+        boolean allowAllRooms = roomTypes.isEmpty();
+        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
+                allowAllRooms = true;
+                break;
+            }
+        }
         if (allowAllRooms) {
             roomSb.append("ALL");
         } else {
@@ -650,6 +699,53 @@ public class StandardBookingController {
         }
 
         return new QueuePerformanceReport(roomSb.toString(), sorted, availCount);
+    }
+
+    // ========================================================================
+    // Stay Duration, Revenue, Active Status & Filter Helpers
+    // ========================================================================
+
+    public static double getNightlyRateForType(String roomType) {
+        if (roomType == null) return 0.0;
+        switch (roomType.toUpperCase()) {
+            case "DELUXE":
+                return 200.0;
+            case "SUITE":
+                return 500.0;
+            case "STANDARD":
+            default:
+                return 100.0;
+        }
+    }
+
+    public static long calculateStayDuration(String checkInDate, String checkOutDate) {
+        try {
+            return LocalDate.parse(checkOutDate).toEpochDay() - LocalDate.parse(checkInDate).toEpochDay();
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    public static double calculateRevenue(Reservation res) {
+        if (res == null) return 0.0;
+        return calculateStayDuration(res.getCheckInDate(), res.getCheckOutDate()) * getNightlyRateForType(res.getRoomType());
+    }
+
+    public static boolean isReservationActive(String status) {
+        return "PENDING".equals(status) || "CONFIRMED".equals(status) || "CHECKED_IN".equals(status);
+    }
+
+    public static boolean isRoomTypeMatched(DoublyLinkedList<String> roomTypes, String roomType) {
+        if (roomTypes.isEmpty()) return true;
+        for (int i = 1; i <= roomTypes.getNumberOfEntries(); i++) {
+            if ("ALL".equalsIgnoreCase(roomTypes.getEntry(i))) {
+                return true;
+            }
+            if (roomTypes.getEntry(i).equalsIgnoreCase(roomType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ========================================================================
@@ -680,15 +776,10 @@ public class StandardBookingController {
             totalRevenue = 0;
             for (int i = 1; i <= totalBookings; i++) {
                 Reservation res = reservations.getEntry(i);
-                try {
-                    long days = LocalDate.parse(res.getCheckOutDate()).toEpochDay() - LocalDate.parse(res.getCheckInDate()).toEpochDay();
-                    double rate = 100.0;
-                    if ("DELUXE".equals(res.getRoomType())) rate = 200.0;
-                    else if ("SUITE".equals(res.getRoomType())) rate = 500.0;
+                if (res != null) {
+                    long days = calculateStayDuration(res.getCheckInDate(), res.getCheckOutDate());
                     totalDays += days;
-                    totalRevenue += (days * rate);
-                } catch (Exception e) {
-                    // Ignore
+                    totalRevenue += calculateRevenue(res);
                 }
             }
         }
@@ -753,7 +844,7 @@ public class StandardBookingController {
             Reservation res = allReservations.getEntry(i);
             if (res != null) {
                 String status = res.getBookingStatus();
-                if ("PENDING".equals(status) || "CONFIRMED".equals(status) || "CHECKED_IN".equals(status)) {
+                if (isReservationActive(status)) {
                     if (res.getRoomType().equalsIgnoreCase(roomType)) {
                         try {
                             LocalDate checkOut = LocalDate.parse(res.getCheckOutDate());
