@@ -12,11 +12,9 @@ import control.StandardBookingController;
 import control.VIPAllocationController;
 import control.VIPAllocationController.VIPReservation;
 import entity.BillingRecord;
-import entity.CustomerReferral;
 import entity.FrontDeskLog;
 import entity.Guest;
 import entity.LoyaltyAccount;
-import entity.Partner;
 import entity.RedemptionTransaction;
 import entity.Reservation;
 import entity.Room;
@@ -24,7 +22,7 @@ import entity.Room;
 /**
  * Main entry point for the TARUMT Resorts System.
  *
- * 1. Creates the shared ADT data structures (Master Registry, queues, tree, partner lists).
+ * 1. Creates the shared ADT data structures (Master Registry, queues, tree).
  * 2. Injects them into the Controllers (Control layer).
  * 3. Passes the Controllers into the MainMenuUI (Boundary layer).
  * 4. Starts the application loop.
@@ -43,8 +41,6 @@ public class Main {
         DoublyLinkedList<Room> roomInventory                    = new DoublyLinkedList<>();
         DoublyLinkedList<LoyaltyAccount> loyaltyAccounts        = new DoublyLinkedList<>();
         DoublyLinkedList<RedemptionTransaction> redemptionLog   = new DoublyLinkedList<>();
-        DoublyLinkedList<Partner> partnerRegistry               = new DoublyLinkedList<>();
-        DoublyLinkedList<CustomerReferral> referralLog          = new DoublyLinkedList<>();
         DoublyLinkedList<FrontDeskLog> checkInLog               = new DoublyLinkedList<>();
         DoublyLinkedList<FrontDeskLog> checkOutLog              = new DoublyLinkedList<>();
         DoublyLinkedList<FrontDeskLog> cancellationLog          = new DoublyLinkedList<>();
@@ -56,8 +52,7 @@ public class Main {
         if (utility.FilePersistenceUtils.dataFilesExist()) {
             utility.FilePersistenceUtils.loadAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue, searchTree,
-                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
-                checkInLog, checkOutLog, cancellationLog, billingLog
+                loyaltyAccounts, redemptionLog,checkInLog, checkOutLog, cancellationLog, billingLog
             );
         } else {
             // Seed Room Inventory (20 rooms)
@@ -104,26 +99,12 @@ public class Main {
             acc2.addHistoryEntry("Initial Seed Points");
             loyaltyAccounts.add(acc2);
 
-            // Seed Strategic Partners
-            Partner p1 = new Partner("Sime Darby Property", "PROPERTY_DEVELOPER", "Dato' Ahmad", "03-78448000", "info@simedarbyproperty.com", "Luxury Township & Residential Purchasing");
-            Partner p2 = new Partner("SP Setia", "PROPERTY_DEVELOPER", "Tan Sri Liew", "03-33448888", "contact@spsetia.com", "Eco-Sanctuary Property & Modern Living Packages");
-            Partner p3 = new Partner("Sunway Property", "PROPERTY_DEVELOPER", "Jeffrey Cheah", "03-56398888", "enquiry@sunwayproperty.com", "Integrated Resort & City Living Homes");
-            Partner p4 = new Partner("Apex Renovation Contractors", "RENOVATION_CONTRACTOR", "Eng Seng", "012-8889900", "sales@apexrenovation.com", "Full House Renovation, Extensions & Wet Works");
-            Partner p5 = new Partner("VoltCraft Electrical Contractors", "ELECTRICAL_CONTRACTOR", "David Wong", "016-7776655", "support@voltcraft.my", "Smart Home Rewiring, DB Box & Solar Fittings");
-            Partner p6 = new Partner("Elegance Interior Design", "INTERIOR_DESIGN_FIRM", "Sophia Chen", "019-3332211", "creative@eleganceid.com", "Bespoke Interior Design & Custom Furniture Upgrades");
-
-            partnerRegistry.add(p1);
-            partnerRegistry.add(p2);
-            partnerRegistry.add(p3);
-            partnerRegistry.add(p4);
-            partnerRegistry.add(p5);
-            partnerRegistry.add(p6);
 
             // Save seeded data to text files
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
                 searchTree,
-                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
+                loyaltyAccounts, redemptionLog,
                 checkInLog, checkOutLog, cancellationLog, billingLog
             );
         }
@@ -156,7 +137,7 @@ public class Main {
             utility.FilePersistenceUtils.saveAllData(
                 masterRegistry, roomInventory, standardQueue, vipQueue,
                 searchTree,
-                loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
+                loyaltyAccounts, redemptionLog, 
                 checkInLog, checkOutLog, cancellationLog, billingLog
             );
         }));
@@ -176,8 +157,7 @@ public class Main {
         utility.FilePersistenceUtils.saveAllData(
             masterRegistry, roomInventory, standardQueue, vipQueue,
             searchTree,
-            loyaltyAccounts, redemptionLog, partnerRegistry, referralLog,
-            checkInLog, checkOutLog, cancellationLog, billingLog
+            loyaltyAccounts, redemptionLog,  checkInLog, checkOutLog, cancellationLog, billingLog
         );
     }
 }

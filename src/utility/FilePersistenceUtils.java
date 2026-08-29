@@ -6,11 +6,9 @@ import adt.DoublyLinkedList;
 import adt.LinkedQueue;
 import control.VIPAllocationController.VIPReservation;
 import entity.BillingRecord;
-import entity.CustomerReferral;
 import entity.FrontDeskLog;
 import entity.Guest;
 import entity.LoyaltyAccount;
-import entity.Partner;
 import entity.RedemptionTransaction;
 import entity.Reservation;
 import entity.Room;
@@ -31,8 +29,6 @@ import java.io.PrintWriter;
  * 4. vip_queue.txt          [ BinaryMaxHeap<VIPReservation> ]
  * 5. loyalty_accounts.txt   [ DoublyLinkedList<LoyaltyAccount> ]
  * 6. redemptions.txt        [ DoublyLinkedList<RedemptionTransaction> ]
- * 7. partners.txt           [ DoublyLinkedList<Partner> ]
- * 8. referrals.txt          [ DoublyLinkedList<CustomerReferral> ]
  * 9. checkins.txt           [ DoublyLinkedList<FrontDeskLog> ]
  * 10. checkouts.txt         [ DoublyLinkedList<FrontDeskLog> ]
  * 11. cancellations.txt     [ DoublyLinkedList<FrontDeskLog> ]
@@ -68,8 +64,6 @@ public class FilePersistenceUtils {
                                    BinarySearchTree<Reservation> searchTree,
                                    DoublyLinkedList<LoyaltyAccount> loyaltyAccounts,
                                    DoublyLinkedList<RedemptionTransaction> redemptionLog,
-                                   DoublyLinkedList<Partner> partnerRegistry,
-                                   DoublyLinkedList<CustomerReferral> referralLog,
                                    DoublyLinkedList<FrontDeskLog> checkInLog,
                                    DoublyLinkedList<FrontDeskLog> checkOutLog,
                                    DoublyLinkedList<FrontDeskLog> cancellationLog,
@@ -82,8 +76,6 @@ public class FilePersistenceUtils {
         saveReservations(searchTree);
         saveLoyaltyAccounts(loyaltyAccounts);
         saveRedemptions(redemptionLog);
-        savePartners(partnerRegistry);
-        saveReferrals(referralLog);
         saveFrontDeskData(checkInLog, checkOutLog, cancellationLog, billingLog, searchTree, roomInventory);
     }
 
@@ -213,36 +205,6 @@ public class FilePersistenceUtils {
         }
     }
 
-    private static void savePartners(DoublyLinkedList<Partner> list) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(DATA_DIR + "/partners.txt"))) {
-            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
-                Partner p = list.getEntry(i);
-                if (p != null) {
-                    writer.println(p.getPartnerId() + "|" + p.getCompanyName() + "|" + p.getPartnerCategory() + "|"
-                            + p.getContactPerson() + "|" + p.getContactPhone() + "|" + p.getEmail() + "|"
-                            + p.getOfferedServices() + "|" + p.getTotalReferralsCount() + "|" + p.getTotalRevenueGenerated());
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error saving partners.txt: " + e.getMessage());
-        }
-    }
-
-    private static void saveReferrals(DoublyLinkedList<CustomerReferral> list) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(DATA_DIR + "/referrals.txt"))) {
-            for (int i = 1; i <= list.getNumberOfEntries(); i++) {
-                CustomerReferral r = list.getEntry(i);
-                if (r != null) {
-                    writer.println(r.getReferralId() + "|" + r.getPartnerId() + "|" + (r.getGuestId() == null ? "" : r.getGuestId()) + "|"
-                            + r.getCustomerName() + "|" + r.getCustomerStage() + "|" + r.getProductIntroduced() + "|"
-                            + r.getDealAmount() + "|" + r.getReferralDate() + "|" + r.getStatus());
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error saving referrals.txt: " + e.getMessage());
-        }
-    }
-
     private static String serializeReservation(Reservation r) {
         String paymentStatus = r.getPaymentStatus() == null || r.getPaymentStatus().trim().isEmpty()
                 ? "UNPAID" : r.getPaymentStatus();
@@ -263,8 +225,6 @@ public class FilePersistenceUtils {
                                    BinarySearchTree<Reservation> searchTree,
                                    DoublyLinkedList<LoyaltyAccount> loyaltyAccounts,
                                    DoublyLinkedList<RedemptionTransaction> redemptionLog,
-                                   DoublyLinkedList<Partner> partnerRegistry,
-                                   DoublyLinkedList<CustomerReferral> referralLog,
                                    DoublyLinkedList<FrontDeskLog> checkInLog,
                                    DoublyLinkedList<FrontDeskLog> checkOutLog,
                                    DoublyLinkedList<FrontDeskLog> cancellationLog,
@@ -280,8 +240,6 @@ public class FilePersistenceUtils {
         }
         loadLoyaltyAccounts(loyaltyAccounts);
         loadRedemptions(redemptionLog);
-        loadPartners(partnerRegistry);
-        loadReferrals(referralLog);
         loadCheckIns(checkInLog);
         loadCheckOuts(checkOutLog);
         loadCancellations(cancellationLog);
@@ -475,63 +433,6 @@ public class FilePersistenceUtils {
             RedemptionTransaction.updateTxnCounter(maxTxn);
         } catch (Exception e) {
             System.err.println("Error loading redemptions.txt: " + e.getMessage());
-        }
-    }
-
-    private static void loadPartners(DoublyLinkedList<Partner> list) {
-        File file = new File(DATA_DIR + "/partners.txt");
-        if (!file.exists()) return;
-
-        int maxId = 1000;
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-                String[] parts = line.split("\\|", -1);
-                if (parts.length >= 9) {
-                    Partner p = new Partner(parts[1], parts[2], parts[3], parts[4], parts[5], parts[6]);
-                    p.setPartnerId(parts[0]);
-                    p.setTotalReferralsCount(Integer.parseInt(parts[7]));
-                    p.setTotalRevenueGenerated(Double.parseDouble(parts[8]));
-                    list.add(p);
-
-                    try {
-                        int num = Integer.parseInt(parts[0].replace("P", ""));
-                        if (num >= maxId) maxId = num + 1;
-                    } catch (Exception ignored) {}
-                }
-            }
-            Partner.updateIdCounter(maxId);
-        } catch (Exception e) {
-            System.err.println("Error loading partners.txt: " + e.getMessage());
-        }
-    }
-
-    private static void loadReferrals(DoublyLinkedList<CustomerReferral> list) {
-        File file = new File(DATA_DIR + "/referrals.txt");
-        if (!file.exists()) return;
-
-        int maxId = 1000;
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.trim().isEmpty()) continue;
-                String[] parts = line.split("\\|", -1);
-                if (parts.length >= 9) {
-                    CustomerReferral r = new CustomerReferral(parts[1], parts[2], parts[3], parts[4], parts[5], Double.parseDouble(parts[6]), parts[7]);
-                    r.setReferralId(parts[0]);
-                    r.setStatus(parts[8]);
-                    list.add(r);
-
-                    try {
-                        int num = Integer.parseInt(parts[0].replace("REF", ""));
-                        if (num >= maxId) maxId = num + 1;
-                    } catch (Exception ignored) {}
-                }
-            }
-            CustomerReferral.updateIdCounter(maxId);
-        } catch (Exception e) {
-            System.err.println("Error loading referrals.txt: " + e.getMessage());
         }
     }
 

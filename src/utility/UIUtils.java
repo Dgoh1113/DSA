@@ -77,8 +77,8 @@ public class UIUtils {
 
    public static void printMainTitleHeader() {
       System.out.println("\u001b[93m\u001b[1m╔═════════════════════════════════════════════════════════════════════╗\u001b[0m");
-      System.out.println("\u001b[93m\u001b[1m║                \u001b[97mTARUMT RESORTS MANAGEMENT SYSTEM\u001b[93m                     ║\u001b[0m");
-      System.out.println("\u001b[93m\u001b[1m║             \u001b[96mHotel Reservation & Strategic Partners System\u001b[93m           ║\u001b[0m");
+      System.out.println("\u001b[93m\u001b[1m║                  \u001b[97mTARUMT RESORTS MANAGEMENT SYSTEM\u001b[93m                   ║\u001b[0m");
+      System.out.println("\u001b[93m\u001b[1m║                      \u001b[96mHotel Reservation System\u001b[93m                       ║\u001b[0m");
       System.out.println("\u001b[93m\u001b[1m╚═════════════════════════════════════════════════════════════════════╝\u001b[0m");
    }
 
@@ -104,12 +104,6 @@ public class UIUtils {
       System.out.println("\u001b[95m\u001b[1m╔═════════════════════════════════════════════════════════════════════╗\u001b[0m");
       System.out.println("\u001b[95m\u001b[1m║     MODULE 4: LOYALTY & REWARDS PROGRAM        [ DLL + Sorting ]   ║\u001b[0m");
       System.out.println("\u001b[95m\u001b[1m╚═════════════════════════════════════════════════════════════════════╝\u001b[0m");
-   }
-
-   public static void printModule5Header() {
-      System.out.println("\u001b[94m\u001b[1m╔═════════════════════════════════════════════════════════════════════╗\u001b[0m");
-      System.out.println("\u001b[94m\u001b[1m║     MODULE 5: STRATEGIC PARTNERS & REFERRALS   [ Customer Referrals ] ║\u001b[0m");
-      System.out.println("\u001b[94m\u001b[1m╚═════════════════════════════════════════════════════════════════════╝\u001b[0m");
    }
 
    public static void printSubHeader(String var0, String var1) {
