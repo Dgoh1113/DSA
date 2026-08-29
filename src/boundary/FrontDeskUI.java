@@ -92,9 +92,11 @@ public class FrontDeskUI {
 
         utility.UIUtils.printSectionHeader("BILLING QUERY", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "7." + utility.UIUtils.RESET
-                + " Query Billing Details ");
+                + " View Billing Details ");
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "8." + utility.UIUtils.RESET
                 + " Record Payment ");
+
+        utility.UIUtils.printSectionHeader("RESERVATION REPORT", utility.UIUtils.GREEN);
         System.out.println("  " + utility.UIUtils.GREEN + utility.UIUtils.BOLD + "9." + utility.UIUtils.RESET
                 + " Generate Front-Desk Report (Filter + Sort)");
 
@@ -107,7 +109,14 @@ public class FrontDeskUI {
 
     private void searchReservation() {
         utility.UIUtils.printSubHeader("MODULE 3 > SEARCH RESERVATION", utility.UIUtils.GREEN);
-        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+        DoublyLinkedList<Reservation> allReservations = controller.getAllReservationsSorted();
+        DoublyLinkedList<Reservation> reservations = new DoublyLinkedList<>();
+        for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
+            Reservation reservation = allReservations.getEntry(i);
+            if (reservation != null && !"PENDING".equals(reservation.getBookingStatus())) {
+                reservations.add(reservation);
+            }
+        }
         if (reservations.isEmpty()) {
             System.out.println("No reservations are currently available to search.");
             return;
@@ -119,7 +128,7 @@ public class FrontDeskUI {
         }
 
         Reservation res = controller.searchReservation(confirmNo);
-        if (res == null) {
+        if (res == null || "PENDING".equals(res.getBookingStatus())) {
             System.out.println("No reservation found with Confirmation No: " + confirmNo);
         } else {
             displayReservationDetails(res);
@@ -214,10 +223,11 @@ public class FrontDeskUI {
         String confirm = utility.UIUtils.safeReadLine(scanner).toUpperCase();
 
         if ("Y".equals(confirm)) {
+            int daysLate = promptDaysLate(confirmNo);
             System.out.print("Has payment been received? (Y = PAID / N = UNPAID): ");
             String paymentInput = utility.UIUtils.safeReadLine(scanner).toUpperCase();
             boolean paymentReceived = "Y".equals(paymentInput);
-            Reservation checkedOut = controller.checkOut(confirmNo, paymentReceived);
+            Reservation checkedOut = controller.checkOut(confirmNo, paymentReceived, daysLate);
             if (checkedOut != null) {
                 System.out.println("\n*** CHECK-OUT SUCCESSFUL ***");
                 System.out.println("Room " + checkedOut.getAssignedRoomNo() + " is now AVAILABLE.");
@@ -225,6 +235,18 @@ public class FrontDeskUI {
                 System.out.println("Payment Status: " + (paymentReceived ? "PAID" : "UNPAID"));
                 FrontDeskController.BillingDetails bill = controller.queryBillingDetails(confirmNo);
                 if (bill != null) {
+                    if (bill.isLateCheckoutPenaltyApplied()) {
+                        if ("POINTS".equals(bill.getLateCheckoutPenaltyType())) {
+                            System.out.println("\n*** LATE CHECK-OUT PENALTY ***");
+                            System.out.println("  " + bill.getLateCheckoutDaysLate()
+                                    + " day(s) late — " + bill.getLateCheckoutPointsDeducted()
+                                    + " loyalty points deducted.");
+                        } else {
+                            System.out.println("\n*** LATE CHECK-OUT PENALTY ***");
+                            System.out.printf("  %d day(s) late — insufficient points, $%.2f fee added to bill.%n",
+                                    bill.getLateCheckoutDaysLate(), bill.getLateCheckoutFeeAmount());
+                        }
+                    }
                     displayBillingDetails(bill);
                 }
             } else {
@@ -232,6 +254,29 @@ public class FrontDeskUI {
             }
         } else {
             System.out.println("Check-out cancelled.");
+        }
+    }
+
+    private int promptDaysLate(String confirmNo) {
+        int suggested = controller.getSuggestedDaysLate(confirmNo);
+        System.out.print("Enter number of days late for check-out (0 if not late check-out) ["
+                + suggested + "]: ");
+        String input = utility.UIUtils.safeReadLine(scanner).trim();
+ 
+        if (input.isEmpty()) {
+            return suggested;
+        }
+ 
+        try {
+            int daysLate = Integer.parseInt(input);
+            if (daysLate < 0) {
+                System.out.println("Days late cannot be negative.");
+                return 0;
+            }
+            return daysLate;
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid number entered. Using suggested value: " + suggested);
+            return suggested;
         }
     }
 
@@ -283,27 +328,32 @@ public class FrontDeskUI {
 
     private void viewAllReservations() {
         utility.UIUtils.printSubHeader("MODULE 3 > VIEW ALL RESERVATIONS (BST SORTED)", utility.UIUtils.GREEN);
-        System.out.println("Total Reservations: " + controller.getReservationCount());
-
-        DoublyLinkedList<Reservation> reservations = controller.getAllReservationsSorted();
+        DoublyLinkedList<Reservation> allReservations = controller.getAllReservationsSorted();
+        DoublyLinkedList<Reservation> reservations = new DoublyLinkedList<>();
+        for (int i = 1; i <= allReservations.getNumberOfEntries(); i++) {
+            Reservation reservation = allReservations.getEntry(i);
+            if (reservation != null && !"PENDING".equals(reservation.getBookingStatus())) {
+                reservations.add(reservation);
+            }
+        }
+        System.out.println("Total Reservations: " + reservations.getNumberOfEntries());
         if (reservations.isEmpty()) {
             System.out.println("No reservations in the system.");
             return;
         }
 
-        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+---------+");
-        System.out.println("| No. | Confirmation   | Guest ID       | Room   | Type      | Status      | Payment |");
-        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+---------+");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
+        System.out.println("| No. | Confirmation   | Guest ID       | Room   | Type      | Status      |");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
 
         for (int i = 1; i <= reservations.getNumberOfEntries(); i++) {
             Reservation res = reservations.getEntry(i);
             String roomNo = (res.getAssignedRoomNo() != null) ? res.getAssignedRoomNo() : "---";
-            String payment = res.getPaymentStatus() == null ? "UNPAID" : res.getPaymentStatus();
-            System.out.printf("| %-3d | %-14s | %-14s | %-6s | %-9s | %-11s | %-7s |%n",
+            System.out.printf("| %-3d | %-14s | %-14s | %-6s | %-9s | %-11s |%n",
                     i, res.getConfirmationNo(), res.getGuestId(),
-                    roomNo, res.getRoomType(), res.getBookingStatus(), payment);
+                    roomNo, res.getRoomType(), res.getBookingStatus());
         }
-        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+---------+");
+        System.out.println("+-----+----------------+----------------+--------+-----------+-------------+");
     }
 
     private void viewRoomStatus() {
@@ -573,6 +623,15 @@ public class FrontDeskUI {
         System.out.printf("  Loyalty Discount: -$%.2f  (%.0f%% %s)%n",
                 bill.getDiscountAmount(), bill.getDiscountRate() * 100, bill.getLoyaltyTier());
         System.out.printf("  SST (%.0f%%)        : $%.2f%n", bill.getTaxRate() * 100, bill.getTaxAmount());
+        if (bill.isLateCheckoutPenaltyApplied()) {
+            if ("POINTS".equals(bill.getLateCheckoutPenaltyType())) {
+                System.out.printf("  Late Check-Out  : %d day(s) late — %d loyalty pts deducted (no fee)%n",
+                        bill.getLateCheckoutDaysLate(), bill.getLateCheckoutPointsDeducted());
+            } else {
+                System.out.printf("  Late CO Penalty : $%.2f  (%d day(s) late, insufficient points)%n",
+                        bill.getLateCheckoutFeeAmount(), bill.getLateCheckoutDaysLate());
+            }
+        }
         System.out.println("+----------------------------------------------------+");
         System.out.printf("  GRAND TOTAL     : $%.2f%n", bill.getGrandTotal());
         if ("VOID".equals(bill.getBillStatus())) {

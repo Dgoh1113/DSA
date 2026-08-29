@@ -14,6 +14,11 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import utility.FilePersistenceUtils;
 
+/**
+ * @author Jude Wong Kah Chung
+ * Controller Enhancement: Module 3 — Front-Desk Service.
+ */
+
 public class FrontDeskController {
 
     private static final String STATUS_PENDING = "PENDING";
@@ -30,6 +35,10 @@ public class FrontDeskController {
     private static final String BILL_FINAL = "FINAL";
     private static final String BILL_VOID = "VOID";
     private static final double TAX_RATE = 0.06;
+    private static final int LATE_CHECKOUT_POINTS_PER_DAY = 800;
+    private static final double LATE_CHECKOUT_DAILY_FEE_SURCHARGE = 50.0;
+    private static final String PENALTY_TYPE_POINTS = "POINTS";
+    private static final String PENALTY_TYPE_FEE = "FEE";
 
     private BinarySearchTree<Reservation> searchTree;
     private DoublyLinkedList<Guest> guestRegistry;
@@ -40,6 +49,7 @@ public class FrontDeskController {
     private DoublyLinkedList<FrontDeskLog> checkOutLog;
     private DoublyLinkedList<FrontDeskLog> cancellationLog;
     private DoublyLinkedList<BillingRecord> billingLog;
+    private DoublyLinkedList<LateCheckoutPenalty> lateCheckoutPenaltyLog = new DoublyLinkedList<>();
 
     public FrontDeskController(BinarySearchTree<Reservation> searchTree,
             DoublyLinkedList<Guest> guestRegistry,
@@ -76,7 +86,7 @@ public class FrontDeskController {
         }
 
         if (!STATUS_CONFIRMED.equals(reservation.getBookingStatus())) {
-            return false; 
+            return false;
         }
 
         if (!isCheckInDateReached(reservation.getCheckInDate())) {
@@ -116,13 +126,17 @@ public class FrontDeskController {
     }
 
     public Reservation checkOut(String confirmationNo, boolean paymentReceived) {
+        return checkOut(confirmationNo, paymentReceived, getSuggestedDaysLate(confirmationNo));
+    }
+
+    public Reservation checkOut(String confirmationNo, boolean paymentReceived, int daysLate) {
         Reservation reservation = searchReservation(confirmationNo);
         if (reservation == null) {
             return null;
         }
 
         if (!STATUS_CHECKED_IN.equals(reservation.getBookingStatus())) {
-            return null; 
+            return null;
         }
 
         String previousPayment = reservation.getPaymentStatus();
@@ -137,6 +151,7 @@ public class FrontDeskController {
         Guest guest = findGuest(reservation.getGuestId());
         int nights = calculateNights(reservation.getCheckInDate(), reservation.getCheckOutDate());
         int pointsAwarded = 0;
+        LateCheckoutPenalty appliedPenalty = evaluateAndApplyLateCheckoutPenalty(reservation, room, guest, daysLate);
 
         if (room != null) {
             room.setStatus(ROOM_AVAILABLE);
@@ -167,6 +182,7 @@ public class FrontDeskController {
                             room.setStatus(ROOM_OCCUPIED);
                         }
                         reverseAccruedPoints(checkedOutGuest, pointsToReverse, confirmationNo);
+                        reverseLateCheckoutPenalty(appliedPenalty, checkedOutGuest, confirmationNo);
                         persistFrontDeskData();
                     });
         }
@@ -331,7 +347,7 @@ public class FrontDeskController {
         return billingLog;
     }
 
-        public static final String sort_field_default = "DEFAULT";
+    public static final String sort_field_default = "DEFAULT";
     public static final String sort_field_confirmation_no = "CONFIRMATION_NO";
     public static final String sort_field_room_no = "ROOM_NO";
     public static final String sort_field_total = "TOTAL";
@@ -624,10 +640,17 @@ public class FrontDeskController {
         String paymentStatus = reservation.getPaymentStatus() == null || reservation.getPaymentStatus().trim().isEmpty()
                 ? PAYMENT_UNPAID
                 : reservation.getPaymentStatus();
+        LateCheckoutPenalty penalty = findLateCheckoutPenalty(reservation.getConfirmationNo());
+        double penaltyFeeAmount = 0.0;
+        if (penalty != null && PENALTY_TYPE_FEE.equals(penalty.getPenaltyType()) && !BILL_VOID.equals(billStatus)) {
+            penaltyFeeAmount = penalty.getFeeAmount();
+            grandTotal += penaltyFeeAmount;
+        }
         if (BILL_VOID.equals(billStatus)) {
             grandTotal = 0.0;
             taxAmount = 0.0;
             discountAmount = 0.0;
+            penaltyFeeAmount = 0.0;
         }
 
         BillingRecord record = new BillingRecord();
@@ -651,7 +674,7 @@ public class FrontDeskController {
         record.setPaymentStatus(paymentStatus);
         record.setBookingStatus(bookingStatus);
         record.setRecordedAt(nowStamp());
-        return new BillingDetails(record);
+        return new BillingDetails(record, penalty);
     }
 
     private double discountRateForTier(String tier) {
@@ -670,6 +693,105 @@ public class FrontDeskController {
             default:
                 return 0.0;
         }
+    }
+
+    private LateCheckoutPenalty evaluateAndApplyLateCheckoutPenalty(Reservation reservation, Room room, Guest guest,
+            int daysLate) {
+        if (daysLate <= 0) {
+            removeLateCheckoutPenalty(reservation.getConfirmationNo());
+            return null;
+        }
+
+        int pointsRequired = daysLate * LATE_CHECKOUT_POINTS_PER_DAY;
+        LoyaltyAccount account = (loyaltyController != null && guest != null)
+                ? loyaltyController.findAccount(guest.getGuestId())
+                : null;
+
+        LateCheckoutPenalty penalty;
+        if (account != null && account.getTotalPoints() >= pointsRequired) {
+            account.setTotalPoints(account.getTotalPoints() - pointsRequired);
+            account.addHistoryEntry("-" + pointsRequired + " pts (Late Check-Out Penalty: "
+                    + daysLate + " day(s) late, Conf #" + reservation.getConfirmationNo() + ")");
+            loyaltyController.checkAndUpgradeTier(guest.getGuestId());
+            penalty = new LateCheckoutPenalty(reservation.getConfirmationNo(), daysLate,
+                    PENALTY_TYPE_POINTS, pointsRequired, 0.0, nowStamp());
+        } else {
+            double nightlyRate = room != null ? room.getNightlyRate() : 0.0;
+            double feeAmount = daysLate * (nightlyRate + LATE_CHECKOUT_DAILY_FEE_SURCHARGE);
+            penalty = new LateCheckoutPenalty(reservation.getConfirmationNo(), daysLate,
+                    PENALTY_TYPE_FEE, 0, feeAmount, nowStamp());
+        }
+
+        upsertLateCheckoutPenalty(penalty);
+        return penalty;
+    }
+
+    /**
+     * Undoes a previously applied late check-out penalty (refunds points if that
+     * was the penalty type).
+     */
+    private void reverseLateCheckoutPenalty(LateCheckoutPenalty penalty, Guest guest, String confirmationNo) {
+        if (penalty == null) {
+            return;
+        }
+        if (PENALTY_TYPE_POINTS.equals(penalty.getPenaltyType()) && loyaltyController != null && guest != null) {
+            LoyaltyAccount account = loyaltyController.findAccount(guest.getGuestId());
+            if (account != null) {
+                account.setTotalPoints(account.getTotalPoints() + penalty.getPointsDeducted());
+                account.addHistoryEntry("+" + penalty.getPointsDeducted()
+                        + " pts (Undo Late Check-Out Penalty Conf #" + confirmationNo + ")");
+                loyaltyController.checkAndUpgradeTier(guest.getGuestId());
+            }
+        }
+        removeLateCheckoutPenalty(confirmationNo);
+    }
+
+    public int getSuggestedDaysLate(String confirmationNo) {
+        Reservation reservation = searchReservation(confirmationNo);
+        if (reservation == null) {
+            return 0;
+        }
+        return calculateDaysLate(reservation.getCheckOutDate());
+    }
+
+    private int calculateDaysLate(String bookedCheckOutDate) {
+        LocalDate booked = parseDate(bookedCheckOutDate);
+        if (booked == null) {
+            return 0;
+        }
+        long daysLate = ChronoUnit.DAYS.between(booked, LocalDate.now());
+        return daysLate > 0 ? (int) daysLate : 0;
+    }
+
+    private void upsertLateCheckoutPenalty(LateCheckoutPenalty penalty) {
+        for (int i = 1; i <= lateCheckoutPenaltyLog.getNumberOfEntries(); i++) {
+            LateCheckoutPenalty existing = lateCheckoutPenaltyLog.getEntry(i);
+            if (existing != null && existing.getConfirmationNo().equals(penalty.getConfirmationNo())) {
+                lateCheckoutPenaltyLog.remove(i);
+                break;
+            }
+        }
+        lateCheckoutPenaltyLog.add(penalty);
+    }
+
+    private void removeLateCheckoutPenalty(String confirmationNo) {
+        for (int i = 1; i <= lateCheckoutPenaltyLog.getNumberOfEntries(); i++) {
+            LateCheckoutPenalty existing = lateCheckoutPenaltyLog.getEntry(i);
+            if (existing != null && existing.getConfirmationNo().equals(confirmationNo)) {
+                lateCheckoutPenaltyLog.remove(i);
+                return;
+            }
+        }
+    }
+
+    private LateCheckoutPenalty findLateCheckoutPenalty(String confirmationNo) {
+        for (int i = 1; i <= lateCheckoutPenaltyLog.getNumberOfEntries(); i++) {
+            LateCheckoutPenalty existing = lateCheckoutPenaltyLog.getEntry(i);
+            if (existing != null && existing.getConfirmationNo().equals(confirmationNo)) {
+                return existing;
+            }
+        }
+        return null;
     }
 
     private void upsertBillingSnapshot(Reservation reservation) {
@@ -760,14 +882,79 @@ public class FrontDeskController {
         return LocalDateTime.now().toString();
     }
 
+    public static class LateCheckoutPenalty {
+        private final String confirmationNo;
+        private final int daysLate;
+        private final String penaltyType; // "POINTS" or "FEE"
+        private final int pointsDeducted;
+        private final double feeAmount;
+        private final String appliedAt;
+
+        private LateCheckoutPenalty(String confirmationNo, int daysLate, String penaltyType,
+                int pointsDeducted, double feeAmount, String appliedAt) {
+            this.confirmationNo = confirmationNo;
+            this.daysLate = daysLate;
+            this.penaltyType = penaltyType;
+            this.pointsDeducted = pointsDeducted;
+            this.feeAmount = feeAmount;
+            this.appliedAt = appliedAt;
+        }
+
+        public String getConfirmationNo() {
+            return confirmationNo;
+        }
+
+        public int getDaysLate() {
+            return daysLate;
+        }
+
+        public String getPenaltyType() {
+            return penaltyType;
+        }
+
+        public int getPointsDeducted() {
+            return pointsDeducted;
+        }
+
+        public double getFeeAmount() {
+            return feeAmount;
+        }
+
+        public String getAppliedAt() {
+            return appliedAt;
+        }
+    }
+
     /**
      * Live billing view used by the front-desk UI.
      */
     public static class BillingDetails {
         private final BillingRecord record;
+        private final LateCheckoutPenalty penalty;
 
-        private BillingDetails(BillingRecord record) {
+        private BillingDetails(BillingRecord record, LateCheckoutPenalty penalty) {
             this.record = record;
+            this.penalty = penalty;
+        }
+
+        public boolean isLateCheckoutPenaltyApplied() {
+            return penalty != null;
+        }
+
+        public String getLateCheckoutPenaltyType() {
+            return penalty != null ? penalty.getPenaltyType() : null;
+        }
+
+        public int getLateCheckoutDaysLate() {
+            return penalty != null ? penalty.getDaysLate() : 0;
+        }
+
+        public int getLateCheckoutPointsDeducted() {
+            return penalty != null ? penalty.getPointsDeducted() : 0;
+        }
+
+        public double getLateCheckoutFeeAmount() {
+            return penalty != null ? penalty.getFeeAmount() : 0.0;
         }
 
         private BillingRecord toRecord() {
